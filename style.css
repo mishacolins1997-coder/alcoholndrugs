@@ -1,0 +1,47 @@
+#and_modal { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; }
+#and_modal .and-box { width: min(720px, 96vw); height: min(86vh, 900px); background: var(--SmartThemeBlurTintColor, #1c1c22); color: var(--SmartThemeBodyColor, #ddd); border: 1px solid var(--SmartThemeBorderColor, #444); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+.and-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; font-size: 1.1em; border-bottom: 1px solid var(--SmartThemeBorderColor, #444); }
+.and-x { cursor: pointer; padding: 2px 8px; opacity: .7; }
+.and-x:hover { opacity: 1; }
+.and-tabs { display: flex; gap: 4px; padding: 8px 10px 0; flex-wrap: wrap; }
+.and-tabs button { flex: 1; padding: 7px 4px; border-radius: 8px 8px 0 0; border: 1px solid var(--SmartThemeBorderColor, #444); background: transparent; color: inherit; cursor: pointer; }
+.and-tabs button.on { background: var(--SmartThemeBorderColor, #444); font-weight: 600; }
+.and-body { flex: 1; overflow-y: auto; padding: 10px 12px 16px; }
+.and-body h4 { margin: 14px 0 6px; opacity: .85; }
+.and-body button { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--SmartThemeBorderColor, #555); background: rgba(255,255,255,.06); color: inherit; cursor: pointer; }
+.and-body button:hover:not(:disabled) { background: rgba(255,255,255,.15); }
+.and-body button:disabled { opacity: .4; cursor: not-allowed; }
+.and-body input, .and-body select { background: rgba(0,0,0,.25); color: inherit; border: 1px solid var(--SmartThemeBorderColor, #555); border-radius: 6px; padding: 4px 6px; max-width: 100%; }
+.and-who { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.and-who select { flex: 1; min-width: 120px; }
+.and-stats { display: grid; gap: 4px; margin-bottom: 10px; padding: 8px; border-radius: 8px; background: rgba(255,255,255,.04); }
+.and-stats input[type=number] { width: 90px; }
+.and-debt { color: #ff8a65; }
+.and-card { margin: 8px 0; padding: 9px 11px; border: 1px solid var(--SmartThemeBorderColor, #444); border-radius: 10px; background: rgba(255,255,255,.03); }
+.and-card.dim { opacity: .65; }
+.and-card-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.and-stage { font-size: .8em; padding: 2px 8px; border-radius: 10px; background: #3a3a44; white-space: nowrap; }
+.and-stage.s1 { background: #4c6b3a; } .and-stage.s2 { background: #8a7a22; } .and-stage.s3 { background: #a8561c; } .and-stage.s4 { background: #a22; }
+.and-bar { display: flex; align-items: center; gap: 8px; font-size: .85em; margin: 2px 0; }
+.and-bar > span { width: 105px; opacity: .85; }
+.and-bar > em { width: 28px; text-align: right; font-style: normal; opacity: .7; }
+.and-track { flex: 1; height: 8px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; }
+.and-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+.and-fill.dep { background: #e0543c; } .and-fill.tol { background: #c9a227; } .and-fill.good { background: #4caf50; } .and-fill.bad { background: #e53935; } .and-fill.warn { background: #ff9800; }
+.and-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 5px 0; }
+.and-tag { font-size: .78em; padding: 2px 7px; border-radius: 8px; background: rgba(255,255,255,.08); }
+.and-tag.t-high { background: #5b3b8a; } .and-tag.t-wd { background: #8a2f2f; } .and-tag.t-tr { background: #2f6b8a; } .and-tag.t-ok { background: #2f7a4a; }
+.and-note { font-size: .82em; opacity: .75; margin: 4px 0; }
+.and-note.warn { color: #ffb74d; opacity: 1; }
+.and-prices { display: flex; flex-wrap: wrap; gap: 10px; font-size: .9em; }
+.and-buy { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 4px 0; font-size: .9em; }
+.and-sell, .and-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.and-form input { flex: 1 1 140px; } .and-form label { display: flex; gap: 4px; align-items: center; font-size: .85em; }
+.and-form label input { flex: 0 0 70px; width: 70px; }
+.and-checks { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; font-size: .85em; }
+.and-checks label input { width: auto; flex: none; }
+.and-treat { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px dashed rgba(255,255,255,.12); }
+.and-del { margin-top: 6px; opacity: .7; }
+.and-log { display: grid; gap: 4px; font-size: .88em; }
+.and-log em { opacity: .5; margin-right: 4px; }
+.and-settings label { display: block; margin: 4px 0; }
