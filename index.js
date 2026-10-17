@@ -11,7 +11,7 @@ const DEFAULTS = {
     enabled: true, autoDetect: true, events: true, toasts: true, autoPay: true,
     difficulty: 1, depth: 1, ticks: 1, currency: '$', startMoney: 500, minorSafe: true,
     allowManual: false, confirmMode: false, skipDialogue: true, fab: true, fabIcon: 'fa-wine-bottle', fabPos: null, winPos: null, winSize: null,
-    phonePrompt: true, phoneStBank: true,
+    phonePrompt: true, phoneStBank: true, phoneStTags: true,
     phone: true, phoneBank: true, phoneSms: true, phoneChannels: true, autoChannel: true,
     lang: (navigator.language || 'en').toLowerCase().startsWith('ru') ? 'ru' : 'en',
 };
@@ -151,8 +151,9 @@ Object.assign(I18N.ru, {
     ph_found: 'Phone-ST найден: {p}', ph_nf: 'Phone-ST не найден (не установлен или ещё не загрузился).',
     ph_bank_ok: 'Банк Phone-ST найден: {p}', ph_bank_no: 'Банк Phone-ST пока не найден — нажмите «Диагностика».',
     ph_last: 'Последняя запись в банк: {x}', ph_test_bank: '🧪 Тест: −1 в банк Phone-ST', ph_diag: '🔍 Диагностика Phone-ST', ph_copy: 'Копировать отчёт',
-    ph_copied: 'Отчёт скопирован', ph_wait: 'Собираю данные…',
-    ph_note: 'Банк Phone-ST принадлежит {{user}}: списания и поступления {{user}} записываются в него. SMS и каналы дилеров попадают в сюжет через промпт — модель показывает их на экране телефона. Уведомления других персонажей остаются в ленте ниже.',
+    s_ph_tags: 'Доставлять SMS и каналы в Phone-ST (скрытые теги в ответе персонажа)', ph_tags_last: 'Последняя доставка в чат: {n} тег(ов) → сообщение #{id}',
+    ph_copied: 'Отчёт скопирован', ph_dl: 'Скачать отчёт (.txt)', ph_wait: 'Собираю данные…',
+    ph_note: 'Всё это относится к телефону {{user}}: банк — через bank.addTransaction, SMS и каналы дилеров — скрытыми тегами в ответе персонажа (формат Phone-ST). Уведомления других персонажей остаются в ленте ниже.',
     ph_ok_dep: '✅ {p}: баланс {a} → {b}{h}', ph_hist_yes: ', операция записана', ph_hist_no: ', без записи в историю',
     s_ph_prompt: 'Передавать уведомления телефона в сюжет (промпт)', s_ph_stbank: 'Автоматически писать в банк Phone-ST',
 });
@@ -160,8 +161,9 @@ Object.assign(I18N.en, {
     ph_found: 'Phone-ST found: {p}', ph_nf: 'Phone-ST not found (not installed or not loaded yet).',
     ph_bank_ok: 'Phone-ST bank found: {p}', ph_bank_no: 'Phone-ST bank not found yet — press "Diagnostics".',
     ph_last: 'Last bank write: {x}', ph_test_bank: '🧪 Test: −1 in the Phone-ST bank', ph_diag: '🔍 Phone-ST diagnostics', ph_copy: 'Copy report',
-    ph_copied: 'Report copied', ph_wait: 'Collecting data…',
-    ph_note: "The Phone-ST bank belongs to {{user}}: {{user}}'s debits and credits are written to it. Dealer SMS and channels reach the story through the prompt — the model shows them on the phone screen. Other characters' notifications stay in the feed below.",
+    s_ph_tags: 'Deliver SMS and channels to Phone-ST (hidden tags in the character reply)', ph_tags_last: 'Last chat delivery: {n} tag(s) → message #{id}',
+    ph_copied: 'Report copied', ph_dl: 'Download report (.txt)', ph_wait: 'Collecting data…',
+    ph_note: "All of this targets {{user}}'s phone: the bank via bank.addTransaction, dealer SMS and channels via hidden tags in the character reply (Phone-ST's format). Other characters' notifications stay in the feed below.",
     ph_ok_dep: '✅ {p}: balance {a} → {b}{h}', ph_hist_yes: ', transaction recorded', ph_hist_no: ', no history entry',
     s_ph_prompt: 'Pass phone notifications to the story (prompt)', s_ph_stbank: 'Automatically write to the Phone-ST bank',
 });
@@ -556,7 +558,7 @@ async function findPhoneBase() {
 async function loadPhoneMods() {
     const base = await findPhoneBase();
     if (!base) return null;
-    for (const f of ['state', 'bank', 'social', 'shop', 'discord', 'prompts']) { // вспомогательные модули — их уже загрузил сам Phone-ST
+    for (const f of ['state', 'bank', 'social', 'shop', 'discord', 'prompts', 'channels', 'ui']) { // вспомогательные модули — их уже загрузил сам Phone-ST
         if (PS.mods[f] !== undefined) continue;
         try { PS.mods[f] = await import(/* webpackIgnore: true */ base + f + '.js'); } catch (err) { PS.mods[f] = null; PS.errors[f] = String(err.message || err).slice(0, 100); }
     }
@@ -593,7 +595,7 @@ function makeTx(sample, arr, amount, memo) {
     const num = (v) => parseFloat(String(v).replace(/\s/g, '').replace(',', '.'));
     const id = 'and' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const nowIso = new Date().toISOString();
-    if (!sample || typeof sample !== 'object') return { id, type: amount >= 0 ? 'income' : 'expense', amount, title: memo, label: memo, description: memo, text: memo, category: 'другое', date: nowIso, timestamp: Date.now() };
+    if (!sample || typeof sample !== 'object') return { id, type: amount >= 0 ? 'income' : 'expense', amount, title: memo, text: memo, date: nowIso, timestamp: Date.now() };
     const amountKey = Object.keys(sample).find((k) => /amount|sum|value|total|price/i.test(k) && numLike(sample[k]));
     const signed = amountKey ? arr.some((x) => numLike(x[amountKey]) && num(x[amountKey]) < 0) : false;
     const typeKey = Object.keys(sample).find((k) => /^(type|kind|direction|dir)$/i.test(k) && typeof sample[k] === 'string');
@@ -612,46 +614,8 @@ function makeTx(sample, arr, amount, memo) {
     }
     return tx;
 }
-const PS_SIGN = { flip: false };
-// Основной путь: родной API банка Phone-ST (bank.js → addTransaction), подпись операции идёт в поле label
-async function phoneStApiTx(amount, memo) {
-    await loadPhoneMods();
-    const bk = PS.mods.bank;
-    if (!bk || typeof bk.addTransaction !== 'function' || typeof bk.getBank !== 'function') return null;
-    const bal = () => { const v = parseFloat(String(bk.getBank()?.balance ?? '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(v) ? v : null; };
-    const before = bal();
-    if (before === null) return null;
-    const attempt = async (amt) => { let r = bk.addTransaction({ amount: amt, label: memo, category: 'другое', silent: true }); if (r && typeof r.then === 'function') r = await r; return r; };
-    let tx = await attempt(PS_SIGN.flip ? -amount : amount);
-    let delta = bal() - before;
-    if (Math.abs(delta - amount) > 0.01 && Math.abs(delta + amount) < 0.01) {
-        // у Phone-ST обратная трактовка знака — откатываем запись и пишем с другим знаком
-        const id = tx && typeof tx === 'object' ? tx.id : tx;
-        if (id && typeof bk.deleteTransaction === 'function') { try { bk.deleteTransaction(id); } catch (e) { /* ignore */ } }
-        PS_SIGN.flip = !PS_SIGN.flip;
-        tx = await attempt(PS_SIGN.flip ? -amount : amount);
-        delta = bal() - before;
-    }
-    try { getContext().saveMetadata(); } catch (e) { /* ignore */ }
-    if (Math.abs(delta) < 0.005) throw new Error(lang() === 'ru' ? 'Phone-ST addTransaction не изменил баланс' : 'Phone-ST addTransaction did not change the balance');
-    return { path: 'bank.js · addTransaction()', from: before, to: bal(), tx: true };
-}
-async function phoneStEnsureContact(name) {
-    if (!name || name === '?') return;
-    await loadPhoneMods();
-    const st = PS.mods.state;
-    if (!st || typeof st.addManualContact !== 'function') return;
-    try {
-        const key = typeof st.keyOf === 'function' ? st.keyOf(name) : String(name).toLowerCase();
-        if (typeof st.getThreadList === 'function' && st.getThreadList().some((th) => th.key === key)) return;
-        st.addManualContact(name, typeof st.randomNumber === 'function' ? st.randomNumber() : '');
-        if (typeof st.saveMeta === 'function') st.saveMeta();
-    } catch (e) { console.debug('[AND] ensure contact', e); }
-}
 async function phoneStDeposit(amount, memo) {
     await loadPhoneMods();
-    const viaApi = await phoneStApiTx(amount, memo);
-    if (viaApi) { PS.bankPath = viaApi.path; return viaApi; }
     const c = findBankCandidates();
     if (!c.length) throw new Error(lang() === 'ru' ? 'банк Phone-ST не найден (нужна диагностика)' : 'Phone-ST bank not found (run diagnostics)');
     const b = c[0];
@@ -672,14 +636,86 @@ async function phoneStDeposit(amount, memo) {
     return { path: b.path, from: cur, to: next, tx: !!txKey };
 }
 function psRefresh() { try { if ($('#and_modal').is(':visible')) render(); } catch (e) { /* ignore */ } }
+// Настоящий API банка Phone-ST: bank.addTransaction({ amount, label, category, ... })
+async function phoneStTx(amount, label) {
+    await loadPhoneMods();
+    const bank = PS.mods.bank;
+    if (!bank || typeof bank.addTransaction !== 'function' || typeof bank.getBank !== 'function') return phoneStDeposit(amount, label);
+    const num = (v) => parseFloat(String(v).replace(/\s/g, '').replace(',', '.')) || 0;
+    const snap = () => { const g = bank.getBank(); return { bal: num(g.balance), n: Array.isArray(g.transactions) ? g.transactions.length : 0 }; };
+    const call = async (amt, extra = {}) => { let r = bank.addTransaction({ amount: amt, label, category: 'другое', ...extra }); if (r && typeof r.then === 'function') r = await r; return r; };
+    const before = snap();
+    let res = await call(PS.inv ? -amount : amount);
+    let after = snap();
+    if (after.n === before.n) { res = await call(PS.inv ? -amount : amount, { historyOnly: true }); after = snap(); } // не хватило денег — хотя бы запись в историю
+    if (after.n === before.n) throw new Error(lang() === 'ru' ? 'Phone-ST не принял операцию' : 'Phone-ST rejected the transaction');
+    const moved = after.bal - before.bal;
+    if (amount !== 0 && moved !== 0 && Math.sign(moved) !== Math.sign(amount)) { // у банка обратный знак — откатываем и повторяем
+        try { if (res && res.id && typeof bank.deleteTransaction === 'function') bank.deleteTransaction(res.id); } catch (e) { /* ignore */ }
+        PS.inv = !PS.inv;
+        res = await call(PS.inv ? -amount : amount); after = snap();
+    }
+    try { getContext().saveMetadata(); } catch (e) { /* ignore */ }
+    PS.bankPath = 'bank.addTransaction';
+    return { path: PS.bankPath, from: before.bal, to: after.bal, tx: true };
+}
 function phoneStBankWrite(item) {
     const ctx = getContext();
     if (!cfg().phoneStBank || item.who !== ctx.name1) return;
-    const memo = t('b_' + item.type, { m: item.merchant || '' });
-    phoneStDeposit(item.amount, memo)
+    const label = t('b_' + item.type, { m: item.merchant || '' });
+    phoneStTx(item.amount, label)
         .then((r) => { PS.last = t('ph_ok_dep', { p: r.path, a: r.from, b: r.to, h: r.tx ? t('ph_hist_yes') : t('ph_hist_no') }); psRefresh(); })
         .catch((err) => { PS.last = '⚠️ ' + err.message; console.warn('[AND] Phone-ST:', err.message); psRefresh(); });
 }
+
+/* ───────────────────────── Phone-ST: SMS и каналы — скрытые теги в сообщении чата ─────────────────────────
+ * Phone-ST строит SMS и каналы из тегов <!--tel:sms:{…}--> и <!--tel:chan:{…}--> в сообщениях чата.
+ * Мы дописываем такие теги в ответ персонажа и просим сам Phone-ST пересобраться. */
+const PSOUT = { queue: [], timer: null, busy: false, hold: false, last: '' };
+const safeTag = (s) => String(s).replace(/-->/g, '-- >');
+function psEnqueue(item) {
+    const ctx = getContext();
+    if (!cfg().phoneStTags || item.who !== ctx.name1) return;
+    let tag = '';
+    if (item.kind === 'sms') tag = `<!--tel:sms:${safeTag(JSON.stringify({ from: item.from, to: ctx.name1, text: item.text }))}-->`;
+    else if (item.kind === 'channel' && (item.action === 'post' || item.action === 'create')) tag = `<!--tel:chan:${safeTag(JSON.stringify({ channel: item.channel, text: item.text }))}-->`;
+    if (!tag) return;
+    PSOUT.queue.push(tag);
+    clearTimeout(PSOUT.timer);
+    PSOUT.timer = setTimeout(() => { if (!PSOUT.hold && !PSOUT.busy) psFlush(); }, 400);
+}
+async function psFlush(targetId) {
+    if (!PSOUT.queue.length) return;
+    const ctx = getContext(), chat = ctx.chat || [];
+    let id = Number.isInteger(targetId) && chat[targetId] && !chat[targetId].is_user && !chat[targetId].is_system ? targetId : -1;
+    if (id < 0) for (let i = chat.length - 1; i >= 0; i--) if (chat[i] && !chat[i].is_user && !chat[i].is_system && chat[i].mes) { id = i; break; }
+    const tags = PSOUT.queue.splice(0);
+    if (id < 0) { // нет ни одного ответа персонажа — скрытое системное сообщение
+        chat.push({ name: 'Alcohol n Drugs', is_user: false, is_system: true, send_date: new Date().toISOString(), mes: tags.join('\n'), extra: { type: 'narrator', alcohol_n_drugs: true } });
+        id = chat.length - 1;
+        try { ctx.addOneMessage && ctx.addOneMessage(chat[id]); } catch (e) { /* ignore */ }
+    } else {
+        chat[id].mes = String(chat[id].mes || '').replace(/\s+$/, '') + '\n' + tags.join('\n');
+        try { ctx.updateMessageBlock && ctx.updateMessageBlock(id, chat[id]); } catch (e) { /* ignore */ }
+    }
+    try { await (ctx.saveChat ? ctx.saveChat() : null); } catch (e) { /* ignore */ }
+    PSOUT.last = t('ph_tags_last', { n: tags.length, id });
+    await psRefreshPhone();
+    psRefresh();
+}
+// пересобрать Phone-ST теми же функциями, что вызывает он сам при новом сообщении
+async function psRefreshPhone() {
+    try { await loadPhoneMods(); } catch (e) { return; }
+    const m = PS.mods, call = (fn, ...a) => { try { return typeof fn === 'function' ? fn(...a) : undefined; } catch (e) { console.warn('[AND] Phone-ST refresh:', e); } };
+    call(m.state && m.state.invalidateChatCache);
+    call(m.channels && m.channels.harvestChannelTags);
+    call(m.ui && m.ui.checkNewIncoming);
+    call(m.ui && m.ui.applyChatHiding);
+    call(m.prompts && m.prompts.updatePhoneInjection);
+    if (m.ui && typeof m.ui.isPhoneOpen === 'function' && call(m.ui.isPhoneOpen)) call(m.ui.render);
+    if (!m.ui) { try { eventSource.emit(event_types.MESSAGE_UPDATED, (getContext().chat || []).length - 1); } catch (e) { /* ignore */ } }
+}
+
 // поиск похожих на мессенджер / каналы структур (только для диагностики)
 function scanGeneric(root, path, re, out, depth, seen) {
     if (!root || typeof root !== 'object' || depth > 5 || seen.has(root) || out.length > 14) return;
@@ -695,54 +731,78 @@ function scanGeneric(root, path, re, out, depth, seen) {
         scanGeneric(v, p, re, out, depth + 1, seen);
     }
 }
+async function psFetchText(u) { try { const r = await fetch(u); return r.ok ? await r.text() : ''; } catch (e) { return ''; } }
 async function phoneDiagnose() {
-    const out = ['Alcohol n Drugs — Phone-ST diagnostics (v1.5.1)'];
+    const out = ['Alcohol n Drugs — Phone-ST diagnostics v2 (v1.6.0)'];
     try {
-        const mods = await loadPhoneMods();
+        await loadPhoneMods();
         out.push('Phone-ST base: ' + (PS.base || 'NOT FOUND'));
-        const FULL = new Set(['discord', 'prompts']);
-        const ordered = Object.entries(mods || {}).sort((a, b) => (FULL.has(b[0]) ? 1 : 0) - (FULL.has(a[0]) ? 1 : 0));
-        for (const [f, m] of ordered) {
-            if (!m) { out.push(`-- ${f}.js: not loaded (${PS.errors[f] || ''})`); continue; }
-            out.push(`-- ${f}.js exports:`);
-            for (const [k, v] of Object.entries(m)) {
-                if (typeof v === 'function') out.push(FULL.has(f) ? `  fn ${k}(${v.length}): ${v.toString().replace(/\s+/g, ' ').slice(0, 700)}` : `  fn ${k}(${v.length})`);
-                else if (v && typeof v === 'object') out.push(`  obj ${k}: keys ${Object.keys(v).slice(0, 25).join(',')}`);
-                else out.push(`  ${typeof v} ${k}`);
+        if (!PS.base) return out.join('\n');
+        // 1. какие модули есть (разбор import в index.js и state.js)
+        const texts = {}, queue = ['index.js', 'state.js'];
+        while (queue.length && Object.keys(texts).length < 30) {
+            const f = queue.shift();
+            if (texts[f] !== undefined) continue;
+            texts[f] = await psFetchText(PS.base + f);
+            for (const m of texts[f].matchAll(/(?:from|import)\s*\(?\s*['"]\.\/([^'"]+?\.js)['"]/g)) if (texts[m[1]] === undefined && !queue.includes(m[1])) queue.push(m[1]);
+        }
+        out.push('modules: ' + Object.keys(texts).map((f) => `${f}(${texts[f].length})`).join(', '));
+        // 2. экспорты
+        const mods = {};
+        for (const f of Object.keys(texts)) {
+            if (/^(index|ui)\.js$/.test(f)) continue;
+            try { mods[f] = await import(/* webpackIgnore: true */ PS.base + f); } catch (e) { out.push(`-- ${f}: import failed ${String(e.message).slice(0, 80)}`); }
+        }
+        for (const [f, m] of Object.entries(mods)) out.push(`-- ${f} exports: ` + Object.entries(m).map(([k, v]) => (typeof v === 'function' ? k + '()' : k)).join(', '));
+        // 3. исходники ключевых функций (SMS, каналы, банк)
+        const grab = (name, n) => {
+            for (const [f, tx] of Object.entries(texts)) { const i = tx.search(new RegExp('function\\s+' + name + '\\b')); if (i >= 0) return `### ${f}: ` + tx.slice(i, i + n).replace(/\s+/g, ' '); }
+            return '';
+        };
+        const names = new Set(['addTransaction', 'harvestBankTags', 'scanChatUncached', 'captureRoleplaySms', 'readPhoneMessage', 'isAppJournal']);
+        for (const tx of Object.values(texts)) {
+            for (const m of tx.matchAll(/function\s+((?:send|receive|incoming|deliver|push|add|create|post|parse|harvest)\w*(?:Sms|Message|Msg|Notif|Channel|Post|Tag)\w*|\w*[Cc]hannel\w*)\s*\(/g)) if (names.size < 24) names.add(m[1]);
+        }
+        for (const n of names) { const g = grab(n, n === 'scanChatUncached' ? 3200 : 1400); if (g) out.push(g); }
+        // 4. промпты, которые Phone-ST вставляет для модели (в них описаны форматы SMS / банка / каналов)
+        try {
+            const eps = getContext().extensionPrompts || {};
+            for (const [k, v] of Object.entries(eps)) {
+                const val = String((v && v.value) || '');
+                if (!val || k === KEY) continue;
+                if (/phone|sms|bank|channel|glass|messag/i.test(k + ' ' + val.slice(0, 500))) out.push(`PROMPT[${k}]: ` + val.replace(/\s+/g, ' ').slice(0, 1800));
             }
-        }
-        for (const k of ['getPhoneMessageText', 'isAppJournal', 'getRoleplaySmsOptions', 'addManualContact', 'scanChat']) { const fnn = mods?.state?.[k]; if (typeof fnn === 'function') out.push(`SRC state.${k}: ` + fnn.toString().replace(/\s+/g, ' ').slice(0, 900)); }
-        for (const k of ['addTransaction', 'bankInjectRule', 'harvestBankTags']) { const fnn = mods?.bank?.[k]; if (typeof fnn === 'function') out.push(`SRC bank.${k}: ` + fnn.toString().replace(/\s+/g, ' ').slice(0, 900)); }
-        const c = findBankCandidates();
-        out.push(c.length ? c.slice(0, 3).map((b) => `BANK candidate: ${b.path} (${b.balKey}=${b.ref[b.balKey]}) keys: ${Object.keys(b.ref).join(',')} sample tx: ${JSON.stringify((Object.values(b.ref).find(Array.isArray) || [])[0] ?? null).slice(0, 300)}`).join('\n') : 'BANK candidate: none');
-        const roots = [];
-        for (const [f, m] of Object.entries(mods || {})) {
-            if (!m) continue;
-            for (const [k, v] of Object.entries(m)) {
-                if (v && typeof v === 'object') roots.push([`${f}.${k}`, v]);
-                else if (typeof v === 'function' && v.length === 0 && /state|data|store|get/i.test(k)) { try { const r = v(); if (r && typeof r === 'object') roots.push([`${f}.${k}()`, r]); } catch (e) { /* ignore */ } }
+        } catch (e) { /* ignore */ }
+        // 5. банк
+        try {
+            const b = mods['bank.js'];
+            if (b) {
+                out.push('bankInjectRule(): ' + String(b.bankInjectRule()).replace(/\s+/g, ' ').slice(0, 1400));
+                const g = b.getBank();
+                out.push('getBank keys: ' + Object.keys(g).join(',') + ' | tx sample: ' + JSON.stringify((g.transactions || [])[0] ?? null).slice(0, 320));
             }
-        }
-        try { roots.push(['chatMetadata', getContext().chatMetadata]); } catch (e) { /* ignore */ }
-        try { roots.push(['extensionSettings', { ...getContext().extensionSettings }]); } catch (e) { /* ignore */ }
-        for (const [label, re] of [['MESSENGER', /sms|messag|messenger|chat|conversation|thread|dialog|inbox|contact/i], ['CHANNELS', /channel|server|guild|discord|telegram|\btg\b|community/i]]) {
-            const res = [], seen = new WeakSet();
-            for (const [pth, r] of roots) scanGeneric({ x: r }, pth, re, res, 0, seen);
-            out.push(`${label} candidates:` + (res.length ? '\n  ' + res.slice(0, 12).join('\n  ') : ' none'));
-        }
+        } catch (e) { out.push('bank info error: ' + e.message); }
+        // 6. данные Phone-ST в метаданных чата
+        try {
+            const md = getContext().chatMetadata || {};
+            for (const [k, v] of Object.entries(md)) {
+                if (k === MOD || !v || typeof v !== 'object') continue;
+                if ('contacts' in v || 'bank' in v || /phone|glass/i.test(k)) {
+                    out.push(`META ${k} keys: ${Object.keys(v).join(',')}`);
+                    for (const [kk, vv] of Object.entries(v)) if (/channel|server|group|tg|tele|discord|thread|sms/i.test(kk)) out.push(`  META ${k}.${kk}: ${JSON.stringify(vv).slice(0, 300)}`);
+                }
+            }
+        } catch (e) { /* ignore */ }
     } catch (err) { out.push('error: ' + err.message); }
-    try { out.push('window globals: ' + Object.keys(window).filter((x) => /phone|bank|pst|discord/i.test(x) && x !== 'AlcoholNDrugs').slice(0, 12).join(', ')); } catch (e) { /* ignore */ }
-    try { out.push('chatMetadata keys: ' + Object.keys(getContext().chatMetadata || {}).join(', ')); } catch (e) { /* ignore */ }
-    try { out.push('scripts (phone): ' + Array.from(document.scripts).map((x) => x.src).filter((u) => /phone/i.test(u)).join(' | ')); } catch (e) { /* ignore */ }
-    return out.join('\n').slice(0, 40000);
+    return out.join('\n').slice(0, 26000);
 }
 // адаптер: банк пишем напрямую, SMS/каналы уходят в сюжет через промпт (см. notices)
 ADAPTERS.push({
     name: 'phone-st',
-    detect: () => true,
+    detect: () => !!PS.base,
     bank: (item) => phoneStBankWrite(item),
-    sms: (item) => { if (item.who === getContext().name1) phoneStEnsureContact(item.from); },
-    channel: (item) => { if (item.who === getContext().name1) phoneStEnsureContact(item.from); },
+    sms: (item) => psEnqueue(item),
+    channel: (item) => psEnqueue(item),
 });
 
 function wd(sub, s, tick) {
@@ -1012,6 +1072,7 @@ function onMessage(id, type) {
             }
         }
         updatePrompt(); save(); updateBadge(); if ($('#and_modal').is(':visible')) render();
+        if (msg.is_user) PSOUT.hold = true; else { PSOUT.hold = false; psFlush(id); }
     } catch (e) { console.error('[AND]', e); }
 }
 
@@ -1041,10 +1102,9 @@ function buildPrompt() {
     }
     const ev = st.events.map((e) => `- ${e.text}`);
     const nts = [];
-    if (c.phonePrompt && c.phone) for (const [name, ch0] of Object.entries(st.chars)) if (ch0.notices && ch0.notices.length) nts.push(`• ${name}'s phone: ${ch0.notices.map((x) => x.text).join(' | ')}`);
-    const phoneRule = nts.length ? `\nPhone events pending delivery. In this reply, show every one of them on the phone using the phone app's own formats: an SMS thread from the named sender, a bank notification with the exact description given, a channel creation or post. Keep sender names, amounts and wording as given. Deliver each event only once and skip any that already appear in the chat:\n${nts.join('\n')}` : '';
+    if (c.phonePrompt && c.phone && !(PS.base && c.phoneStTags)) for (const [name, ch0] of Object.entries(st.chars)) if (ch0.notices && ch0.notices.length) nts.push(`• ${name}'s phone: ${ch0.notices.map((x) => x.text).join(' | ')}`);
     if (!lines.length && !ev.length && !nts.length) return '';
-    return `[Hidden game state — substance use tracker. Let it quietly shape narration and the characters' behavior; never mention numbers, stages or this block. Do not glamorize substance use and do not give real-world instructions for obtaining, making or dosing substances.${c.minorSafe ? ' Never depict a minor character using these substances.' : ''} Write in the language of the roleplay.]\n${lines.join('\n')}${ev.length ? '\nCurrent events to work into the scene naturally:\n' + ev.join('\n') : ''}${phoneRule}`;
+    return `[Hidden game state — substance use tracker. Let it quietly shape narration and the characters' behavior; never mention numbers, stages or this block. Do not glamorize substance use and do not give real-world instructions for obtaining, making or dosing substances.${c.minorSafe ? ' Never depict a minor character using these substances.' : ''} Write in the language of the roleplay.]\n${lines.join('\n')}${ev.length ? '\nCurrent events to work into the scene naturally:\n' + ev.join('\n') : ''}${nts.length ? '\nRecent phone notifications — these MUST appear in your next reply as incoming messages / notifications on the phone, using the phone message format described elsewhere in this prompt:\n' + nts.join('\n') : ''}`;
 }
 function updatePrompt() {
     try { setExtensionPrompt(KEY, buildPrompt(), 1, cfg().depth, false, 0); } catch (e) { console.warn('[AND] prompt', e); }
@@ -1171,9 +1231,10 @@ function tabPhone() {
     let h = whoBar() + `<div class="and-card"><div class="and-note">${PS.base ? t('ph_found', { p: esc(PS.base) }) : t('ph_nf')}</div>
     <div class="and-note">${bankOk ? t('ph_bank_ok', { p: esc(PS.bankPath) }) : t('ph_bank_no')}</div>
     ${PS.last ? `<div class="and-note">${t('ph_last', { x: esc(PS.last) })}</div>` : ''}
+    ${PSOUT.last ? `<div class="and-note">${esc(PSOUT.last)}</div>` : ''}
     <div class="and-note">${t('ph_note')}</div>
     <div class="and-sell"><button data-act="psbanktest">${t('ph_test_bank')}</button><button data-act="phtest">${t('ph_test')}</button><button data-act="psdiag">${t('ph_diag')}</button></div>
-    ${ui.diag ? `<textarea id="and_diag" readonly rows="10" style="width:100%;margin-top:6px;font-size:.78em">${esc(ui.diag)}</textarea><button data-act="psdiagcopy">${t('ph_copy')}</button>` : ''}</div>`;
+    ${ui.diag ? `<textarea id="and_diag" readonly rows="10" style="width:100%;margin-top:6px;font-size:.78em">${esc(ui.diag)}</textarea><button data-act="psdiagcopy">${t('ph_copy')}</button> <button data-act="psdiagdl">${t('ph_dl')}</button>` : ''}</div>`;
     if (!feed.length) return h + `<div class="and-note">${t('ph_empty')}</div>`;
     return h + feed.slice(0, 60).map((i) => `<div class="and-card and-ph ${i.kind}"><div class="and-card-h"><b>${i.kind === 'bank' ? '🏦' : i.kind === 'sms' ? '💬' : '📢'} ${esc(i.channel ? i.channel : i.from)}</b><span class="and-tag">#${i.t}</span></div><div>${esc(i.text)}</div></div>`).join('');
 }
@@ -1298,11 +1359,15 @@ const actions = {
     phtest() { phoneTest(ui.who); after(); },
     phinspect() { phoneInspect(); window.toastr?.info(t('ph_inspected'), 'Alcohol n Drugs'); },
     psbanktest() {
-        phoneStDeposit(-1, 'Alcohol n Drugs test')
+        phoneStTx(-1, 'Alcohol n Drugs test')
             .then((r) => { PS.last = t('ph_ok_dep', { p: r.path, a: r.from, b: r.to, h: r.tx ? t('ph_hist_yes') : t('ph_hist_no') }); render(); })
             .catch((err) => { PS.last = '⚠️ ' + err.message; render(); });
     },
     async psdiag() { ui.diag = t('ph_wait'); render(); ui.diag = await phoneDiagnose(); console.log('[Alcohol n Drugs]\n' + ui.diag); render(); },
+    psdiagdl() {
+        const b = new Blob([ui.diag], { type: 'text/plain' }), a = document.createElement('a');
+        a.href = URL.createObjectURL(b); a.download = 'phone-st-diagnostics.txt'; document.body.appendChild(a); a.click(); a.remove();
+    },
     psdiagcopy() { const el = document.getElementById('and_diag'); try { navigator.clipboard.writeText(ui.diag); } catch (e) { if (el) { el.select(); document.execCommand('copy'); } } window.toastr?.success(t('ph_copied'), 'Alcohol n Drugs'); },
     deldealer(d) { const st = S(); st.dealers = st.dealers.filter((x) => x.id !== d.dealer); after(); },
     treat(d) {
@@ -1431,6 +1496,7 @@ function settingsHtml() {
     <label class="checkbox_label"><input type="checkbox" id="and_phone"> ${t('s_phone')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_phbank"> ${t('s_ph_bank')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_stbank"> ${t('s_ph_stbank')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_sttags"> ${t('s_ph_tags')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_phprompt"> ${t('s_ph_prompt')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_phsms"> ${t('s_ph_sms')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_phchan"> ${t('s_ph_chan')}</label>
@@ -1466,6 +1532,7 @@ function bindSettings() {
     $('#and_fabicon').val(c.fabIcon).on('change', function () { c.fabIcon = this.value; saveSettingsDebounced(); createFab(); });
     $('#and_layout').on('click', resetLayout);
     $('#and_phone').prop('checked', c.phone).on('change', function () { c.phone = this.checked; saveSettingsDebounced(); });
+    $('#and_sttags').prop('checked', c.phoneStTags).on('change', function () { c.phoneStTags = this.checked; saveSettingsDebounced(); updatePrompt(); });
     $('#and_stbank').prop('checked', c.phoneStBank).on('change', function () { c.phoneStBank = this.checked; saveSettingsDebounced(); });
     $('#and_phprompt').prop('checked', c.phonePrompt).on('change', function () { c.phonePrompt = this.checked; saveSettingsDebounced(); updatePrompt(); });
     $('#and_phbank').prop('checked', c.phoneBank).on('change', function () { c.phoneBank = this.checked; saveSettingsDebounced(); });
@@ -1502,11 +1569,13 @@ jQuery(() => {
     $(document).on('change', '#and_modal [data-chg]', function () { const f = changes[this.dataset.chg]; if (f) f(this.dataset, this.value, this); });
     window.addEventListener('resize', () => { keepInView(document.getElementById('and_fab')); if ($('#and_modal').is(':visible')) placeWindow(); });
 
+    if (event_types.GENERATION_STARTED) eventSource.on(event_types.GENERATION_STARTED, () => { PSOUT.busy = true; });
+    for (const ev of [event_types.GENERATION_ENDED, event_types.GENERATION_STOPPED]) if (ev) eventSource.on(ev, () => { PSOUT.busy = false; });
     eventSource.on(event_types.MESSAGE_SENT, (id) => onMessage(id));
     eventSource.on(event_types.MESSAGE_RECEIVED, (id, type) => onMessage(id, type));
     eventSource.on(event_types.CHAT_CHANGED, () => { fallback = null; ui.who = null; updatePrompt(); updateBadge(); if ($('#and_modal').is(':visible')) render(); });
     window.AlcoholNDrugs = {
-        version: '1.5.0',
+        version: '1.7.0',
         getState: () => S(),
         phone: {
             registerAdapter(a) { if (a && a.name && !ADAPTERS.find((x) => x.name === a.name)) ADAPTERS.push(a); return ADAPTERS.length; },
@@ -1519,7 +1588,7 @@ jQuery(() => {
     };
     import('./phone-adapters.js').catch((e) => console.debug('[AND] no phone-adapters.js', e));
     // Phone-ST может загрузиться позже нас — ищем его с задержкой и повторяем
-    const psProbe = async (n) => { try { await loadPhoneMods(); if (PS.base) { if (PS.mods.bank && typeof PS.mods.bank.addTransaction === 'function') PS.bankPath = 'bank.js · addTransaction()'; else { const bc = findBankCandidates()[0]; if (bc) PS.bankPath = bc.path; } psRefresh(); return; } } catch (e) { /* ignore */ } if (n > 0) setTimeout(() => psProbe(n - 1), 4000); };
+    const psProbe = async (n) => { try { await loadPhoneMods(); if (PS.base) { findBankCandidates()[0] && (PS.bankPath = findBankCandidates()[0].path); psRefresh(); return; } } catch (e) { /* ignore */ } if (n > 0) setTimeout(() => psProbe(n - 1), 4000); };
     setTimeout(() => psProbe(5), 2500);
     updatePrompt();
     console.log('[Alcohol n Drugs] loaded');
