@@ -10,6 +10,8 @@ const KEY = 'alcohol_n_drugs_prompt';
 const DEFAULTS = {
     enabled: true, autoDetect: true, events: true, toasts: true, autoPay: true,
     difficulty: 1, depth: 1, ticks: 1, currency: '$', startMoney: 500, minorSafe: true,
+    allowManual: false, confirmMode: false, skipDialogue: true, fab: true, fabIcon: 'fa-wine-bottle', fabPos: null, winPos: null, winSize: null,
+    phone: true, phoneBank: true, phoneSms: true, phoneChannels: true, autoChannel: true,
     lang: (navigator.language || 'en').toLowerCase().startsWith('ru') ? 'ru' : 'en',
 };
 
@@ -92,6 +94,58 @@ const I18N = {
         s_lang: 'Язык интерфейса / Interface language', s_open: 'Open panel', s_reset: 'Reset chat data',
     },
 };
+Object.assign(I18N.ru, {
+    tab_phone: '📱 Телефон', ph_empty: 'Пока нет уведомлений.', ph_adapters: 'Подключено адаптеров телефона: {n}',
+    ph_none: 'Расширение телефона не подключено — работает встроенная лента.', ph_test: 'Тест уведомлений', ph_inspect: 'Диагностика (консоль)',
+    ph_inspected: 'Результат диагностики выведен в консоль браузера (F12).',
+    k_bank: 'Банк', k_sms: 'SMS', k_chan: 'Канал',
+    b_purchase: 'Покупка: {m}', b_transfer: 'Перевод: {m}', b_fine: 'Штраф', b_treatment: 'Лечение: {m}', b_debt: 'Погашение долга: {m}', b_income: 'Перевод от клиента',
+    sms_bought_1: 'Всё готово. Забирай и не светись.', sms_bought_2: 'Заказ собран. Приятно иметь с тобой дело.', sms_bought_3: 'Принято. Как договаривались.',
+    sms_credit: 'Записал на тебя {a}{c}. Верни вовремя — не люблю напоминать.',
+    sms_debt: '{n}, пора вернуть {a}{c}. Не заставляй меня напоминать.',
+    sms_offer_1: 'Есть свежий товар ({s}). Если надумаешь — пиши.', sms_offer_2: 'Давно тебя не слышал. Могу достать {s}, цена хорошая.',
+    sms_shortage: 'Поставки задержались, цены на {s} выросли. Кто хочет — берите сейчас.',
+    sms_raid: 'Говорят, за тобой следят. Пока не пиши и не звони.',
+    ch_name: '{d} · канал', ch_created: 'Канал создан.', ch_joined: '{n} подписан(а) на канал.', ch_left: '{n} отписался(лась) от канала.', ch_price: 'Прайс: {list}',
+    chan_join: '📢 Подписаться на канал', chan_leave: '🔕 Отписаться от канала',
+    s_phone: 'Интеграция с телефоном (банк / SMS / каналы)', s_ph_bank: 'Банк: списания и поступления', s_ph_sms: 'SMS от дилеров',
+    s_ph_chan: 'Каналы дилеров', s_ph_auto: 'Автоподписка на канал дилера при покупке',
+});
+Object.assign(I18N.en, {
+    tab_phone: '📱 Phone', ph_empty: 'No notifications yet.', ph_adapters: 'Phone adapters connected: {n}',
+    ph_none: 'No phone extension connected — the built-in feed is used.', ph_test: 'Test notifications', ph_inspect: 'Diagnostics (console)',
+    ph_inspected: 'Diagnostics printed to the browser console (F12).',
+    k_bank: 'Bank', k_sms: 'SMS', k_chan: 'Channel',
+    b_purchase: 'Purchase: {m}', b_transfer: 'Transfer: {m}', b_fine: 'Fine', b_treatment: 'Treatment: {m}', b_debt: 'Debt repayment: {m}', b_income: 'Transfer from a client',
+    sms_bought_1: "All set. Pick it up and keep a low profile.", sms_bought_2: 'Order ready. Pleasure doing business.', sms_bought_3: 'Got it. As agreed.',
+    sms_credit: "Put {a}{c} on your tab. Pay on time — I hate reminding people.",
+    sms_debt: "{n}, time to settle {a}{c}. Don't make me remind you.",
+    sms_offer_1: 'Got fresh stock ({s}). Text me if you change your mind.', sms_offer_2: "Haven't heard from you in a while. I can get {s}, good price.",
+    sms_shortage: 'Deliveries are delayed, {s} prices went up. Grab it now if you want it.',
+    sms_raid: "Word is you're being watched. Don't text or call for a while.",
+    ch_name: '{d} · channel', ch_created: 'Channel created.', ch_joined: '{n} subscribed to the channel.', ch_left: '{n} left the channel.', ch_price: 'Price list: {list}',
+    chan_join: '📢 Subscribe to channel', chan_leave: '🔕 Leave channel',
+    s_phone: 'Phone integration (bank / SMS / channels)', s_ph_bank: 'Bank: debits and credits', s_ph_sms: 'SMS from dealers',
+    s_ph_chan: 'Dealer channels', s_ph_auto: 'Auto-subscribe to a dealer channel on purchase',
+});
+Object.assign(I18N.ru, {
+    res: 'Сбросить', res_all: 'Сбросить всё у персонажа', res_confirm: 'Сбросить зависимости, здоровье и розыск у «{n}»?',
+    hp_restore: 'Вылечить до 100', forgive: 'Простить долг', clear_heat: 'Сбросить розыск', manage: '⚙ Управление',
+    l_reset_sub: '{n}: сброшена зависимость ({s}).', l_reset_all: '{n}: сброшены зависимости, здоровье и розыск.', l_health: '{n}: здоровье {h}.', l_forgive: '{n}: долг списан.',
+    pend_h: 'Найдено в тексте — подтвердите', pend_ok: 'Принять', pend_del: 'Отклонить', pend_all: 'Принять все', pend_clear: 'Отклонить все',
+    manual_off: 'Зависимость растёт только от упоминаний употребления в постах.',
+    s_manual: 'Разрешить ручную кнопку «Употребить» (иначе только по тексту постов)', s_confirm: 'Подтверждать найденное употребление вручную',
+    s_dialog: 'Игнорировать прямую речь при поиске', s_fab: 'Плавающая кнопка', s_fabicon: 'Иконка кнопки', s_fabreset: 'Вернуть кнопку и окно на место',
+});
+Object.assign(I18N.en, {
+    res: 'Reset', res_all: 'Reset everything for this character', res_confirm: 'Reset dependencies, health and wanted level for "{n}"?',
+    hp_restore: 'Heal to 100', forgive: 'Forgive debt', clear_heat: 'Clear wanted level', manage: '⚙ Manage',
+    l_reset_sub: '{n}: dependence reset ({s}).', l_reset_all: '{n}: dependencies, health and wanted level reset.', l_health: '{n}: health {h}.', l_forgive: '{n}: debt cleared.',
+    pend_h: 'Found in text — please confirm', pend_ok: 'Accept', pend_del: 'Dismiss', pend_all: 'Accept all', pend_clear: 'Dismiss all',
+    manual_off: 'Dependence grows only from use mentioned in posts.',
+    s_manual: 'Allow the manual "Use" button (otherwise only from post text)', s_confirm: 'Confirm detected use manually',
+    s_dialog: 'Ignore quoted dialogue when scanning', s_fab: 'Floating button', s_fabicon: 'Button icon', s_fabreset: 'Reset button and window position',
+});
 const lang = () => (I18N[cfg().lang] ? cfg().lang : 'en');
 const t = (k, p = {}) => String(I18N[lang()][k] ?? I18N.en[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => (p[x] ?? ''));
 
@@ -108,8 +162,6 @@ const SUBS = {
             'курит почти постоянно, одышка, хриплый кашель, нервничает и злится без сигарет, здоровье страдает',
         ],
         treat: ['self', 'nrt', 'therapy', 'group'],
-        kw: ['lit\\s+(?:a|his|her|another)\\s+(?:cigarette|cig|smoke)', 'cigarettes?\\b', 'vap(?:e|es|ed|ing)\\b', 'nicotine', 'tobacco',
-            'smokes\\b', 'smoking\\b', 'smoked\\b', 'drags?\\s+on', 'закур', 'курит', 'курил', 'курю', 'куришь', 'сигарет', 'вейп', 'затянул', 'затяжк', 'табак'],
     },
     alcohol: {
         name: 'Алкоголь', short: 'Алкоголь', icon: '🍺', legal: true, price: 12,
@@ -122,9 +174,6 @@ const SUBS = {
             'не функционирует без алкоголя, тремор, проблемы с печенью, потеря работы и отношений, риск судорог при резком отказе',
         ],
         treat: ['self', 'detox', 'meds', 'group', 'rehab'],
-        kw: ['drinks?\\s+(?:a\\s+|the\\s+|some\\s+|another\\s+)?(?:whisk(?:e)?y|beer|wine|vodka|alcohol|shot|glass|bottle)', 'drank\\b', 'drunk\\b', 'whisk(?:e)?y', 'vodka', 'beers?\\b', 'wine\\b', 'tequila',
-            'rum\\b', 'gin\\b', 'cognac', 'brandy', 'champagne', 'shots?\\s+of', 'booze', 'alcohol', 'hangover', 'tipsy', 'downed',
-            'пьёт', 'пьет', 'пью', 'пьют', 'пил', 'выпил', 'выпить', 'выпьем', 'алкогол', 'водк', 'виски', 'пиво', 'пива(?![а-яё])', 'вино(?![а-яё])', 'коньяк', 'текил', 'шампанск', 'самогон', 'рюмк', 'стопк', 'пьян', 'напил', 'похмел'],
     },
     cannabis: {
         name: 'Каннабис', short: 'Каннабис', icon: '🌿', legal: false, price: 20,
@@ -137,7 +186,6 @@ const SUBS = {
             'не может расслабиться или уснуть без травки, апатия, тревожность, паранойя',
         ],
         treat: ['self', 'therapy', 'group', 'rehab'],
-        kw: ['weed\\b', 'marijuana', 'cannabis', 'bongs?\\b', '(?:smokes?|rolls?|lights?)\\s+(?:a\\s+|the\\s+)?joint', 'a\\s+joint', 'edibles?\\b', 'косяк', 'джойнт', 'марихуан', 'каннабис', 'бонг', 'гашиш', 'травку', 'траву\\s+(?:курит|кури)'],
     },
     stimulants: {
         name: 'Стимуляторы', short: 'Стимуляторы', icon: '⚡', legal: false, price: 60,
@@ -150,8 +198,6 @@ const SUBS = {
             'навязчивая тяга, психозоподобные состояния, проблемы с сердцем, долги, изоляция, высокий риск передозировки',
         ],
         treat: ['self', 'therapy', 'group', 'rehab'],
-        kw: ['cocaine', 'coke\\b', 'snort(?:s|ed)?\\s+(?:a\\s+)?(?:line|coke|some)', 'lines?\\s+of\\s+(?:coke|cocaine)', 'amphetamine', 'meth\\b', 'methamphetamine', 'adderall', 'stimulants?\\b',
-            'кокаин', 'кокс(?![а-яё])', 'нюхнул', 'нюхает', 'амфетамин', 'метамфетамин', 'мет(?![а-яё])', 'стимулятор', 'аддерал'],
     },
     opioids: {
         name: 'Опиоиды', short: 'Опиоиды', icon: '💉', legal: false, price: 70,
@@ -164,7 +210,6 @@ const SUBS = {
             'вся жизнь крутится вокруг вещества, тяжёлая ломка без дозы, высокий риск передозировки, долги и криминал',
         ],
         treat: ['self', 'detox', 'subst', 'group', 'rehab'],
-        kw: ['heroin', 'opioids?\\b', 'opiates?\\b', 'fentanyl', 'morphine', 'oxycodone', 'shoots?\\s+up', 'shot\\s+up', 'героин', 'опиат', 'опиоид', 'фентанил', 'морфин', 'оксикодон', 'уколол', 'вколол', 'вмазал', 'подсел на'],
     },
     sedatives: {
         name: 'Седативные / бензо', short: 'Седативные', icon: '💊', legal: false, price: 30,
@@ -177,7 +222,6 @@ const SUBS = {
             'не может жить без препарата, спутанность, падения, опасная ломка при резком отказе, риск передозировки в сочетании с алкоголем',
         ],
         treat: ['taper', 'therapy', 'group', 'rehab', 'self'],
-        kw: ['xanax', 'benzos?\\b', 'valium', 'diazepam', 'sedatives?\\b', 'sleeping\\s+pills?', 'tranquili[sz]ers?', 'ксанакс', 'бензо', 'диазепам', 'транквилизатор', 'снотворн', 'феназепам', 'седатив'],
     },
     psychedelics: {
         name: 'Психоделики', short: 'Психоделики', icon: '🍄', legal: false, price: 40,
@@ -190,16 +234,63 @@ const SUBS = {
             'устойчивые нарушения восприятия, паранойя, трудно отличать реальность от видений',
         ],
         treat: ['therapy', 'self'],
-        kw: ['lsd\\b', 'acid\\s+trip', 'magic\\s+mushrooms?', 'shrooms?\\b', 'psilocybin', 'ayahuasca', 'mdma', 'ecstasy', 'molly\\b', 'лсд', 'псилоцибин', 'мдма', 'экстази', 'аяуаска', 'волшебные грибы', 'грибочки'],
     },
 };
 const IDS = Object.keys(SUBS);
+const W = (b) => `(?<![a-zа-яё])(?:${b})(?![a-zа-яё])`;
+const V_SMOKE = 'smok(?:e|es|ed|ing)|puff(?:s|ed|ing)?|takes?\\s+(?:a\\s+)?(?:drag|puff|hit|toke)|took\\s+(?:a\\s+)?(?:drag|puff|hit|toke)|inhal(?:e|es|ed|ing)|затянул[а-яё]*|затягива[а-яё]*|курит|курят|курил[а-яё]*|курю|курим|выкурил[а-яё]*|покурил[а-яё]*|пыхн[а-яё]*|курн[а-яё]*';
+const V_DRINK = 'drinks?|drank|drinking|sips?|sipped|sipping|downs?|downed|chugs?|chugged|gulps?|gulped|swigs?|swigged|knocks?\\s+back|knocked\\s+back|tosses?\\s+back|tossed\\s+back|(?:takes?|took)\\s+(?:a\\s+)?(?:sip|shot|swig|gulp|drink)|ha(?:s|ve|d|ving)\\s+(?:a\\s+|another\\s+|some\\s+)?(?:drink|shot)|пь(?:ёт|ет|ют|ём|ем)|пью|пил[а-яё]*|выпил[а-яё]*|выпива[а-яё]*|глотнул[а-яё]*|хлебнул[а-яё]*|опрокинул[а-яё]*|осушил[а-яё]*|пригубил[а-яё]*|отпил[а-яё]*';
+const V_INGEST = 'takes?|took|taking|pops?|popped|swallow(?:s|ed)?|downs?|downed|drops?|dropped|eats?|ate|uses?|used|snort(?:s|ed)?|sniff(?:s|ed)?|does|did|shoots?|shot|inject(?:s|ed)?|smok(?:e|es|ed|ing)|принял[а-яё]*|принима[а-яё]*|проглотил[а-яё]*|закинул[а-яё]*|закидыва[а-яё]*|употребил[а-яё]*|употребля[а-яё]*|съел[а-яё]*|ест|нюхнул[а-яё]*|нюха[а-яё]*|занюхал[а-яё]*|вдохнул[а-яё]*|выпил[а-яё]*|выпива[а-яё]*';
+const DET = {
+    nicotine: {
+        imp: ['lit\\s+(?:up\\s+)?(?:a|an|his|her|another|the)\\s+(?:cigarette|cigar|cig|smoke)', 'закур(?:ил|ила|или|ивает|ивают|ивая)'],
+        nn: ['cigarettes?', 'cigs?', 'cigars?', 'pipe', 'tobacco', 'vape', 'vaping', 'e-?cig', 'nicotine', 'сигарет[а-яё]*', 'сигар[а-яё]*', 'трубк[а-яё]*', 'табак[а-яё]*', 'вейп[а-яё]*', 'никотин[а-яё]*', 'папирос[а-яё]*'],
+        vb: V_SMOKE,
+    },
+    alcohol: {
+        imp: ['got\\s+drunk', 'напил[а-яё]*(?:ся|сь)', 'ha(?:s|ve|d|ving)\\s+(?:a\\s+|another\\s+)?(?:drink|beer|shot)'],
+        nn: ['whisk(?:e)?y', 'vodka', 'beers?', 'wine', 'tequila', 'rum', 'gin', 'cognac', 'brandy', 'champagne', 'booze', 'alcohol', 'liquor', 'bourbon', 'scotch', 'cocktails?', 'shots?', 'lager', 'ale', 'sake', 'absinthe',
+            'водк[а-яё]*', 'виск[а-яё]*', 'пив[а-яё]*', 'вин[ао]', 'коньяк[а-яё]*', 'текил[а-яё]*', 'шампанск[а-яё]*', 'самогон[а-яё]*', 'рюмк[а-яё]*', 'стопк[а-яё]*', 'алкогол[а-яё]*', 'ром', 'джин', 'коктейл[а-яё]*', 'абсент[а-яё]*', 'настойк[а-яё]*', 'ликёр[а-яё]*', 'ликер[а-яё]*'],
+        vb: V_DRINK,
+    },
+    cannabis: {
+        imp: ['hits?\\s+(?:the\\s+)?(?:bong|joint)', 'tokes?', 'пыхн[а-яё]*', 'курн[а-яё]*'],
+        nn: ['weed', 'marijuana', 'cannabis', 'joints?', 'bongs?', 'edibles?', 'hash(?:ish)?', 'spliff', 'травк[а-яё]*', 'косяк[а-яё]*', 'джойнт[а-яё]*', 'марихуан[а-яё]*', 'каннабис[а-яё]*', 'бонг[а-яё]*', 'гашиш[а-яё]*'],
+        vb: V_SMOKE + '|' + V_INGEST,
+    },
+    stimulants: {
+        imp: ['(?:snorts?|snorted|does|did)\\s+(?:a\\s+)?lines?'],
+        nn: ['cocaine', 'coke', 'meth', 'methamphetamine', 'amphetamines?', 'adderall', 'кокаин[а-яё]*', 'кокс', 'амфетамин[а-яё]*', 'метамфетамин[а-яё]*', 'мет', 'аддерал[а-яё]*'],
+        vb: V_INGEST,
+    },
+    opioids: {
+        imp: ['shoots?\\s+up', 'shot\\s+up', 'вколол(?:а|и)?\\s+себе', 'уколол(?:ся|ась|ись)', 'вмазал(?:ся|ась|ись)'],
+        nn: ['heroin', 'fentanyl', 'morphine', 'opioids?', 'opiates?', 'oxy(?:codone)?', 'oxycontin', 'codeine', 'vicodin', 'percocet', 'героин[а-яё]*', 'фентанил[а-яё]*', 'морфин[а-яё]*', 'опиат[а-яё]*', 'опиоид[а-яё]*', 'оксикодон[а-яё]*', 'кодеин[а-яё]*'],
+        vb: V_INGEST,
+    },
+    sedatives: {
+        imp: [],
+        nn: ['xanax', 'benzos?', 'valium', 'diazepam', 'lorazepam', 'sedatives?', 'tranquili[sz]ers?', 'sleeping\\s+pills?', 'ксанакс[а-яё]*', 'бензо', 'диазепам[а-яё]*', 'феназепам[а-яё]*', 'транквилизатор[а-яё]*', 'снотворн[а-яё]*', 'седатив[а-яё]*', 'клоназепам[а-яё]*'],
+        vb: V_INGEST,
+    },
+    psychedelics: {
+        imp: ['dropp?(?:ed|s)?\\s+acid', 'tripp(?:ing|ed)\\s+on'],
+        nn: ['lsd', 'shrooms?', 'magic\\s+mushrooms?', 'psilocybin', 'ayahuasca', 'mdma', 'ecstasy', 'molly', 'acid\\s+tabs?', 'лсд', 'псилоцибин[а-яё]*', 'мдма', 'экстази', 'аяуаск[а-яё]*'],
+        vb: V_INGEST,
+    },
+};
 for (const id of IDS) {
-    const s = SUBS[id];
-    const body = s.kw.join('|');
-    s.re = new RegExp('(?<![a-zа-яё])(?:' + body + ')', 'i');
-    s.reG = new RegExp('(?<![a-zа-яё])(?:' + body + ')', 'gi');
+    const d = DET[id];
+    d.impR = d.imp.length ? new RegExp(W(d.imp.join('|')), 'i') : null;
+    d.nnR = new RegExp(W(d.nn.join('|')), 'i');
+    d.vbR = new RegExp(W(d.vb), 'i');
 }
+// отрицание / гипотеза / желание / предложение — перед глаголом
+const HYP = new RegExp(W("want(?:s|ed)?\\s+to|wanna|would|could|should|might|gonna|going\\s+to|will|let'?s|lets|if|offer(?:s|ed)?|ask(?:s|ed)?\\s+(?:for|to)|craving|crave[sd]?|refus[a-z]*|declin[a-z]*|can'?t|cannot|mustn'?t|how\\s+about|care\\s+for|would\\s+you\\s+like|хочу|хочет|хочешь|хотел[а-яё]*|хотят|хотим|давай[а-яё]*|мож(?:ет|но|ешь|ем)|надо|нужно|следует|стоит|предлага[а-яё]*|предложил[а-яё]*|пообещал[а-яё]*|будет|будешь|буду|будем|если|бы|откаж[а-яё]*|отказал[а-яё]*|мечта[а-яё]*|нельзя|запрещ[а-яё]*|не\\s+стал[а-яё]*|обещ[а-яё]*"), 'i');
+const FIRST_P = new RegExp(W("i|i'm|i've|i'd|me|my|myself|we|я|мы|мне|мой|моя|себе"), 'i');
+const YOU_P = new RegExp(W('you|your|yourself|ты|тебя|тебе|твой|твоя|вы|вас'), 'i');
+const THIRD_P = new RegExp(W('he|she|they|him|her|his|their|himself|herself|он|она|они|его|её|ее|их'), 'i');
+const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const NEG = /(?:^|[^a-zа-яё])(?:не|нет|без|никогда|ни|бросил[а-яё]*|отказ[а-яё]*|never|no|not|don'?t|didn'?t|won'?t|can'?t|quit|stopped|refus[a-z]*)(?![a-zа-яё])/i;
 const STAGES_L = {
     ru: ['Чист', 'Пробует', 'Привычка', 'Зависимость', 'Тяжёлая зависимость'],
@@ -311,7 +402,7 @@ const toast = (m, t = 'info') => { if (cfg().toasts && window.toastr) window.toa
 
 function newState() {
     return {
-        v: 1, tick: 0, chars: {}, dealers: defaultDealers(), events: [], log: [],
+        v: 1, tick: 0, chars: {}, dealers: defaultDealers(), events: [], log: [], pending: [], phone: { feed: [] }, channels: {},
         market: Object.fromEntries(IDS.map((id) => [id, SUBS[id].price])),
     };
 }
@@ -343,6 +434,79 @@ function log(text) {
 }
 const pushEvent = (text) => S().events.push({ text, ttl: 2 });
 
+/* ───────────────────────── Мост к телефону ───────────────────────── */
+const ADAPTERS = [];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+
+function emitPhone(item) {
+    const cf = cfg();
+    if (!cf.enabled || !cf.phone) return;
+    if ((item.kind === 'bank' && !cf.phoneBank) || (item.kind === 'sms' && !cf.phoneSms) || (item.kind === 'channel' && !cf.phoneChannels)) return;
+    const st = S();
+    item.id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    item.t = st.tick; item.ts = Date.now(); item.currency = cf.currency;
+    const ph = st.phone || (st.phone = { feed: [] });
+    ph.feed.unshift(item);
+    if (ph.feed.length > 150) ph.feed.length = 150;
+    try { window.dispatchEvent(new CustomEvent('alcohol-n-drugs:phone', { detail: item })); } catch (e) { /* ignore */ }
+    for (const a of ADAPTERS) {
+        try { if (a.detect && !a.detect()) continue; if (typeof a[item.kind] === 'function') a[item.kind](item); }
+        catch (e) { console.warn('[AND] phone adapter', a.name, e); }
+    }
+    toast(`${item.kind === 'bank' ? '🏦' : item.kind === 'sms' ? '💬' : '📢'} ${item.from}: ${item.text}`);
+}
+function phoneBank(who, type, amount, merchant = '') {
+    const a = Math.abs(Math.round(amount));
+    if (!a) return;
+    emitPhone({ kind: 'bank', who, from: t('k_bank'), amount: amount < 0 ? -a : a, type, merchant,
+        text: `${amount < 0 ? '−' : '+'}${a}${cfg().currency} · ${t('b_' + type, { m: merchant })}` });
+}
+function phoneSms(who, dealer, key, p = {}) {
+    const vs = [1, 2, 3].map((i) => key + '_' + i).filter((k) => I18N.en[k]);
+    emitPhone({ kind: 'sms', who, from: dealer ? dn(dealer) : '?', dealerId: dealer?.id, text: t(vs.length ? pick(vs) : key, { ...p, n: who }) });
+}
+function channelOf(d) { const st = S(); st.channels = st.channels || {}; return st.channels[d.id]; }
+function chanItem(d, who, action, text) {
+    return { kind: 'channel', action, who, channelId: 'ch_' + d.id, channel: t('ch_name', { d: dn(d) }), dealerId: d.id, from: dn(d), text };
+}
+function joinChannel(d, who) {
+    const st = S(); st.channels = st.channels || {};
+    let chn = st.channels[d.id];
+    const first = !chn;
+    if (!chn) chn = st.channels[d.id] = { id: 'ch_' + d.id, subs: [] };
+    if (chn.subs.includes(who)) return;
+    chn.subs.push(who);
+    emitPhone(chanItem(d, who, first ? 'create' : 'join', first ? t('ch_created') : t('ch_joined', { n: who })));
+}
+function leaveChannel(d, who) {
+    const chn = channelOf(d);
+    if (!chn || !chn.subs.includes(who)) return;
+    chn.subs = chn.subs.filter((x) => x !== who);
+    emitPhone(chanItem(d, who, 'leave', t('ch_left', { n: who })));
+}
+function channelPost(d, text) {
+    const chn = channelOf(d);
+    if (!chn) return;
+    for (const who of chn.subs) emitPhone(chanItem(d, who, 'post', text));
+}
+function phoneInspect() {
+    const info = {
+        windowGlobals: Object.keys(window).filter((k) => /phone|bank|discord|twitch|^st[A-Z_]/i.test(k)),
+        extensionSettingsKeys: Object.keys(extension_settings).filter((k) => /phone|bank|discord/i.test(k)),
+        chatMetadataKeys: Object.keys(getContext().chatMetadata || {}).filter((k) => k !== MOD),
+        phoneScripts: [...document.scripts].map((s) => s.src).filter((s) => /phone/i.test(s)),
+    };
+    console.log('[Alcohol n Drugs] phone diagnostics', info);
+    return info;
+}
+function phoneTest(who) {
+    const d = S().dealers.find((x) => !x.builtin) || S().dealers[0];
+    phoneBank(who, 'transfer', -50, dn(d));
+    phoneSms(who, d, 'sms_bought');
+    joinChannel(d, who);
+    channelPost(d, t('ch_price', { list: d.subs.map((id) => `${ss(id)} ${cfg().currency}${Math.round(S().market[id] * d.priceMul)}`).join(' · ') }));
+}
+
 function wd(sub, s, tick) {
     if (!sub.wdSev || s.last == null || s.high > 0 || s.dep < 15) return null;
     const since = tick - s.last;
@@ -361,11 +525,12 @@ function wd(sub, s, tick) {
 function dealerFor(id) { return S().dealers.find((d) => d.subs.includes(id) && !d.builtin) || S().dealers.find((d) => d.subs.includes(id)); }
 
 function pay(name, c, id) {
-    const st = S(), sub = SUBS[id], price = Math.round(st.market[id] * (dealerFor(id)?.priceMul || 1));
-    if (c.money >= price) { c.money -= price; return; }
+    const st = S(), sub = SUBS[id], dl = dealerFor(id), price = Math.round(st.market[id] * (dl?.priceMul || 1));
+    if (c.money >= price) { c.money -= price; phoneBank(name, sub.legal ? 'purchase' : 'transfer', -price, dl ? dn(dl) : ''); return; }
     if (sub.legal) { c.money = 0; return; }
     c.debt += price * 1.25;
-    c.creditor = c.creditor || dealerFor(id)?.name || 'дилер';
+    c.creditor = c.creditor || (dl ? dn(dl) : 'dealer');
+    if (dl) { phoneSms(name, dl, 'sms_credit', { a: Math.round(price * 1.25), c: cfg().currency }); if (cfg().autoChannel) joinChannel(dl, name); }
     c.heat = clamp(c.heat + 3);
     log(t('l_credit', { n: name, s: ss(id), p: price, c: cfg().currency }));
 }
@@ -428,10 +593,19 @@ function advanceOne() {
     st.tick++;
     st.events = st.events.filter((e) => (e.ttl -= 1) > 0);
     if (st.tick % 8 === 0) {
+        const shortages = [];
         for (const id of IDS) {
             let p = st.market[id] * rnd(0.92, 1.1);
-            if (Math.random() < 0.04) { p *= 1.6; log(t('l_market', { s: ss(id) })); }
+            if (Math.random() < 0.04) { p *= 1.6; shortages.push(id); log(t('l_market', { s: ss(id) })); }
             st.market[id] = clamp(p, SUBS[id].price * 0.6, SUBS[id].price * 2.5);
+        }
+        for (const d of st.dealers) {
+            if (channelOf(d)?.subs.length) channelPost(d, t('ch_price', { list: d.subs.map((id) => `${ss(id)} ${cur}${Math.round(st.market[id] * d.priceMul)}`).join(' · ') }));
+        }
+        for (const id of shortages) {
+            const dl = dealerFor(id);
+            if (!dl) continue;
+            for (const [nm, ch0] of Object.entries(st.chars)) if ((ch0.subs[id]?.dep || 0) >= 30) phoneSms(nm, dl, 'sms_shortage', { s: ss(id) });
         }
     }
     for (const [name, c] of Object.entries(st.chars)) {
@@ -461,6 +635,14 @@ function advanceOne() {
             if (cfg().events && stageOf(s.dep) >= 2 && !s.high && since > sub.grace && Math.random() < 0.05 * D) {
                 pushEvent(`${name} is hit by an intense craving for ${sub.L.en.name}${s.treat ? ' and struggles to stay in treatment' : ''}.`);
             }
+            if (cfg().events && !sub.legal && stageOf(s.dep) >= 2 && !s.high && since > sub.grace && st.tick - (c.lastOffer ?? -99) > 15 && Math.random() < 0.03 * D) {
+                const dl = dealerFor(id);
+                if (dl) {
+                    c.lastOffer = st.tick;
+                    phoneSms(name, dl, 'sms_offer', { s: ss(id) });
+                    pushEvent(`${name} gets a text from a dealer offering ${sub.L.en.name} — a real temptation${s.treat ? ' while in treatment' : ''}.`);
+                }
+            }
             if (s.treat) { s.treat.left--; if (s.treat.left <= 0) finishTreatment(name, id); }
             if (s.dep > topDep) { topDep = s.dep; topId = id; }
         }
@@ -476,29 +658,93 @@ function advanceOne() {
                 const fine = Math.round(Math.min(c.money, rnd(100, 300)));
                 c.money -= fine; c.heat = 30;
                 log(t('l_raid', { n: name, f: fine, c: cur, k: conf }));
+                phoneBank(name, 'fine', -fine);
+                const rd = st.dealers.find((x) => !x.builtin); if (rd) phoneSms(name, rd, 'sms_raid');
                 pushEvent(`${name} is stopped by police over illegal substances (confiscation, fine${conf > 2 ? ', possible arrest' : ''}). Narrate the legal consequences.`);
             }
             if (c.debt > 200 && Math.random() < 0.03) {
                 log(t('l_debt', { n: name, cr: c.creditor, d: Math.round(c.debt), c: cur }));
+                const cd = st.dealers.find((x) => dn(x) === c.creditor) || st.dealers.find((x) => !x.builtin);
+                if (cd) phoneSms(name, cd, 'sms_debt', { a: Math.round(c.debt), c: cur });
                 pushEvent(`${c.creditor} (a dealer) pressures ${name} to repay a debt of about ${Math.round(c.debt)}${cur}; veiled threats.`);
             }
         }
     }
 }
 
-function detect(text) {
-    const found = [];
-    for (const id of IDS) {
-        const re = new RegExp(SUBS[id].reG.source, 'gi');
-        let m, count = 0;
-        while ((m = re.exec(text))) {
-            const before = text.slice(Math.max(0, m.index - 22), m.index);
-            if (!NEG.test(before)) count++;
-            if (m.index === re.lastIndex) re.lastIndex++;
-        }
-        if (count) found.push({ id, units: Math.min(3, Math.ceil(count / 2)) });
+/* ───────── Умное определение употребления: действие + вещество + кто ───────── */
+function cleanText(raw, skipDialogue) {
+    let s = String(raw || '')
+        .replace(/```[\s\S]*?```/g, ' ').replace(/<[^>]*>/g, ' ')
+        .replace(/\(\(.*?\)\)/gs, ' ').replace(/\(\s*OOC[^)]*\)/gi, ' ');
+    if (skipDialogue) {
+        s = s.replace(/"[^"\n]*"/g, ' ').replace(/“[^”\n]*”/g, ' ').replace(/«[^»\n]*»/g, ' ');
+        s = s.split('\n').map((l) => l.replace(/^\s*[—–]\s+[^—–]*(?:[—–]|$)/, ' ')).join('\n');
     }
-    return found;
+    return s.replace(/[*_~`#>]+/g, ' ');
+}
+function nameMap(ctx) {
+    const set = new Set([ctx.name1, ...Object.keys(S().chars)]);
+    if (ctx.name2 && ctx.characterId !== undefined) set.add(ctx.name2);
+    try {
+        if (ctx.groupId) {
+            const g = (ctx.groups || []).find((x) => String(x.id) === String(ctx.groupId));
+            for (const av of g?.members || []) { const c = (ctx.characters || []).find((x) => x.avatar === av); if (c) set.add(c.name); }
+        }
+    } catch (e) { /* ignore */ }
+    const map = new Map();
+    for (const n of set) {
+        if (!n) continue;
+        map.set(n.toLowerCase(), n);
+        const first = n.split(/[\s_-]+/)[0];
+        if (first.length >= 3 && !map.has(first.toLowerCase())) map.set(first.toLowerCase(), n);
+    }
+    return map;
+}
+function subjectFor(sent, vi, map, author, isUser, partner) {
+    const before = sent.slice(0, vi);
+    let best = null, bi = -1;
+    for (const [alias, canon] of map) {
+        const re = new RegExp('(?<![a-zа-яё])' + reEsc(alias) + '[а-яё]{0,3}(?![a-zа-яё])', 'ig');
+        let m;
+        while ((m = re.exec(before))) if (m.index > bi) { bi = m.index; best = canon; }
+    }
+    if (best) return best;
+    const tail = before.slice(-70);
+    if (FIRST_P.test(tail)) return author;
+    if (YOU_P.test(tail)) return isUser ? partner : getContext().name1;
+    if (THIRD_P.test(tail)) return isUser ? partner : author;
+    return author;
+}
+function detectSmart(raw, ctx, author, isUser) {
+    const text = cleanText(raw, cfg().skipDialogue);
+    const map = nameMap(ctx);
+    const partner = !ctx.groupId && ctx.characterId !== undefined ? ctx.name2 : null;
+    const acc = new Map();
+    const sentences = text.match(/[^.!?…\n]+[.!?…]*/g) || [];
+    for (const sent of sentences) {
+        if (/\?\s*$/.test(sent) || sent.trim().length < 4) continue;
+        for (const id of IDS) {
+            const d = DET[id];
+            let vi = -1;
+            const im = d.impR && d.impR.exec(sent);
+            if (im) vi = im.index;
+            else {
+                const nm = d.nnR.exec(sent), vm = nm && d.vbR.exec(sent);
+                if (nm && vm && Math.abs(vm.index - nm.index) <= 80) vi = vm.index;
+            }
+            if (vi < 0) continue;
+            const around = sent.slice(Math.max(0, vi - 45), vi + 1);
+            if (NEG.test(sent.slice(Math.max(0, vi - 25), vi)) || HYP.test(around)) continue;
+            const who = subjectFor(sent, vi, map, author, isUser, partner);
+            if (!who) continue;
+            const key = who + '\u0001' + id;
+            const cur = acc.get(key) || { who, id, units: 0, snip: sent.trim().slice(0, 110) };
+            cur.units = Math.min(3, cur.units + 1);
+            acc.set(key, cur);
+        }
+    }
+    return [...acc.values()];
 }
 
 function onMessage(id, type) {
@@ -512,14 +758,21 @@ function onMessage(id, type) {
         msg.extra.and_done = true;
         for (let i = 0; i < cfg().ticks; i++) advanceOne();
         if (cfg().autoDetect) {
-            const who = msg.is_user ? ctx.name1 : msg.name;
-            const hits = detect(msg.mes || '');
+            const author = msg.is_user ? ctx.name1 : (msg.name || ctx.name2);
+            const hits = detectSmart(msg.mes || '', ctx, author, !!msg.is_user);
+            const st = S();
+            st.pending = st.pending || [];
             for (const h of hits) {
-                useSub(who, h.id, h.units, 'auto');
-                toast(`${who}: ${SUBS[h.id].icon} ${ss(h.id)} → ${Math.round(ch(who).subs[h.id].dep)}%`);
+                if (cfg().confirmMode) {
+                    st.pending.push({ id: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), who: h.who, sub: h.id, units: h.units, snip: h.snip });
+                    if (st.pending.length > 30) st.pending.shift();
+                } else {
+                    useSub(h.who, h.id, h.units, 'auto');
+                    toast(`${h.who}: ${SUBS[h.id].icon} ${ss(h.id)} → ${Math.round(ch(h.who).subs[h.id].dep)}%`);
+                }
             }
         }
-        updatePrompt(); save(); if ($('#and_modal').is(':visible')) render();
+        updatePrompt(); save(); updateBadge(); if ($('#and_modal').is(':visible')) render();
     } catch (e) { console.error('[AND]', e); }
 }
 
@@ -556,7 +809,7 @@ function updatePrompt() {
 }
 
 /* ───────────────────────── Интерфейс: панель ───────────────────────── */
-const ui = { tab: 'chars', who: null };
+const ui = { tab: 'chars', who: null, open: new Set() };
 const bar = (label, v, cls) => `<div class="and-bar"><span>${label}</span><div class="and-track"><div class="and-fill ${cls}" style="width:${clamp(v)}%"></div></div><em>${Math.round(v)}</em></div>`;
 
 function names() {
@@ -576,9 +829,20 @@ function whoBar() {
 function tabChars() {
     const c = ch(ui.who), cur = cfg().currency, st = S();
     let h = whoBar();
+    const pend = st.pending || [];
+    if (pend.length) {
+        const opts = (sel) => names().map((x) => `<option ${x === sel ? 'selected' : ''}>${esc(x)}</option>`).join('');
+        h += `<div class="and-pending"><b>${t('pend_h')}</b> <button data-act="pendall">${t('pend_all')}</button> <button data-act="pendclear">${t('pend_clear')}</button>` +
+            pend.map((p) => `<div class="and-card"><div class="and-note">“${esc(p.snip)}”</div><div class="and-ctl"><select data-chg="pendwho" data-pid="${p.id}">${opts(p.who)}</select> ${SUBS[p.sub].icon} ${ss(p.sub)} ×${p.units}
+            <button data-act="pendok" data-pid="${p.id}">${t('pend_ok')}</button><button data-act="penddel" data-pid="${p.id}">${t('pend_del')}</button></div></div>`).join('') + `</div>`;
+    }
     h += `<div class="and-stats"><div>💰 <input type="number" id="and_money" value="${Math.round(c.money)}"> ${cur} <button data-act="setmoney">OK</button></div>
-    ${bar(t('health'), c.health, c.health < 40 ? 'bad' : 'good')}${bar(t('heat'), c.heat, 'warn')}
-    ${c.debt > 0 ? `<div class="and-debt">${t('debt')}: <b>${Math.round(c.debt)}${cur}</b> (${esc(c.creditor)}) <button data-act="paydebt">${t('repay')}</button></div>` : ''}</div>`;
+    ${bar(t('health'), c.health, c.health < 40 ? 'bad' : 'good')}
+    <div class="and-ctl"><input type="range" min="0" max="100" value="${Math.round(c.health)}" data-chg="sethealth"><button data-act="hp" data-d="-10">−10</button><button data-act="hp" data-d="10">+10</button><button data-act="hp" data-d="100">❤ ${t('hp_restore')}</button></div>
+    ${bar(t('heat'), c.heat, 'warn')}
+    <div class="and-ctl"><input type="range" min="0" max="100" value="${Math.round(c.heat)}" data-chg="setheat"><button data-act="clearheat">${t('clear_heat')}</button></div>
+    ${c.debt > 0 ? `<div class="and-debt">${t('debt')}: <b>${Math.round(c.debt)}${cur}</b> (${esc(c.creditor)}) <button data-act="paydebt">${t('repay')}</button> <button data-act="forgive">${t('forgive')}</button></div>` : ''}
+    <div class="and-ctl"><button class="and-danger" data-act="resetall">⟲ ${t('res_all')}</button></div></div>`;
     for (const id of IDS) {
         const sub = SUBS[id], s = sb(c, id), stg = stageOf(s.dep), w = wd(sub, s, st.tick);
         const active = s.dep > 0 || s.inv > 0 || s.uses > 0;
@@ -591,8 +855,14 @@ function tabChars() {
         if (active) h += bar(t('dependence'), s.dep, 'dep') + bar(t('tolerance'), s.tol, 'tol');
         h += `<div class="and-tags">${status}${s.inv ? `<span class="and-tag">${t('tag_stock', { n: s.inv })}</span>` : ''}</div>`;
         if (stg >= 2) h += `<div class="and-note">${esc(sub.L[lang()].cons[Math.min(stg - 2, 2)])}</div>`;
-        h += `<button data-act="use" data-sub="${id}">${s.inv ? t('use_stock') : t('use')}</button></div>`;
+        const canManual = cfg().allowManual || !cfg().autoDetect;
+        if (canManual) h += `<button data-act="use" data-sub="${id}">${s.inv ? t('use_stock') : t('use')}</button> `;
+        h += `<details class="and-adv" data-key="${id}" ${ui.open.has(id) ? 'open' : ''}><summary>${t('manage')}</summary>
+          <div class="and-ctl"><span>${t('dependence')}</span><input type="range" min="0" max="100" value="${Math.round(s.dep)}" data-chg="setdep" data-sub="${id}"></div>
+          <div class="and-ctl"><span>${t('tolerance')}</span><input type="range" min="0" max="100" value="${Math.round(s.tol)}" data-chg="settol" data-sub="${id}"></div>
+          <div class="and-ctl"><button class="and-danger" data-act="resetsub" data-sub="${id}">⟲ ${t('res')}</button></div></details></div>`;
     }
+    if (!(cfg().allowManual || !cfg().autoDetect)) h += `<div class="and-note">${t('manual_off')}</div>`;
     return h;
 }
 
@@ -609,6 +879,10 @@ function tabMarket() {
             <button data-act="buy" data-dealer="${d.id}" data-sub="${id}" data-qty="1">×1</button>
             <button data-act="buy" data-dealer="${d.id}" data-sub="${id}" data-qty="5">×5</button>
             ${SUBS[id].legal ? '' : `<button data-act="buy" data-dealer="${d.id}" data-sub="${id}" data-qty="1" data-credit="1">${t('credit')}</button>`}</div>`;
+        }
+        if (d.id !== 'shop') {
+            const joined = channelOf(d)?.subs.includes(ui.who);
+            h += `<button data-act="${joined ? 'chanleave' : 'chanjoin'}" data-dealer="${d.id}">${joined ? t('chan_leave') : t('chan_join')}</button> `;
         }
         if (!d.builtin) h += `<button class="and-del" data-act="deldealer" data-dealer="${d.id}">${t('del')}</button>`;
         h += `</div>`;
@@ -649,38 +923,87 @@ function tabTreat() {
     return h;
 }
 
+function tabPhone() {
+    const st = S(), feed = (st.phone?.feed || []).filter((i) => i.who === ui.who);
+    const n = ADAPTERS.filter((a) => !a.detect || a.detect()).length;
+    let h = whoBar() + `<div class="and-note">${n ? t('ph_adapters', { n }) : t('ph_none')}</div>
+    <div class="and-sell"><button data-act="phtest">${t('ph_test')}</button><button data-act="phinspect">${t('ph_inspect')}</button></div>`;
+    if (!feed.length) return h + `<div class="and-note">${t('ph_empty')}</div>`;
+    return h + feed.slice(0, 60).map((i) => `<div class="and-card and-ph ${i.kind}"><div class="and-card-h"><b>${i.kind === 'bank' ? '🏦' : i.kind === 'sms' ? '💬' : '📢'} ${esc(i.channel ? i.channel : i.from)}</b><span class="and-tag">#${i.t}</span></div><div>${esc(i.text)}</div></div>`).join('');
+}
+
 function tabLog() {
     const st = S();
     return `<div class="and-log">${st.log.length ? st.log.map((l) => `<div><em>#${l.t}</em> ${esc(l.x)}</div>`).join('') : `<div class="and-note">${t('log_empty')}</div>`}</div>`;
 }
 
 function render() {
-    const tabs = [['chars', t('tab_chars')], ['market', t('tab_market')], ['treat', t('tab_treat')], ['log', t('tab_log')]];
+    const tabs = [['chars', t('tab_chars')], ['market', t('tab_market')], ['treat', t('tab_treat')], ['phone', t('tab_phone')], ['log', t('tab_log')]];
     $('#and_modal .and-tabs').html(tabs.map(([k, v]) => `<button data-act="tab" data-tab="${k}" class="${ui.tab === k ? 'on' : ''}">${v}</button>`).join(''));
-    const fn = { chars: tabChars, market: tabMarket, treat: tabTreat, log: tabLog }[ui.tab];
+    const fn = { chars: tabChars, market: tabMarket, treat: tabTreat, phone: tabPhone, log: tabLog }[ui.tab];
     const scroll = $('#and_modal .and-body').scrollTop();
     $('#and_modal .and-body').html(fn());
     $('#and_modal .and-body').scrollTop(scroll);
 }
+document.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (d && d.classList && d.classList.contains('and-adv')) { if (d.open) ui.open.add(d.dataset.key); else ui.open.delete(d.dataset.key); }
+}, true);
 function openPanel() {
     if (!$('#and_modal').length) {
-        $('body').append(`<div id="and_modal"><div class="and-box"><div class="and-head"><b>🍺 Alcohol n Drugs</b><span class="and-x" data-act="close">✕</span></div><div class="and-tabs"></div><div class="and-body"></div></div></div>`);
+        $('body').append(`<div id="and_modal"><div class="and-head"><b>🍺 Alcohol n Drugs</b><span class="and-x" data-act="close" data-nodrag>✕</span></div><div class="and-tabs"></div><div class="and-body"></div></div>`);
+        const el = document.getElementById('and_modal');
+        makeDraggable(el, el.querySelector('.and-head'), (pos) => { cfg().winPos = pos; saveSettingsDebounced(); });
+        if (window.ResizeObserver) {
+            let first = true;
+            new ResizeObserver(() => {
+                if (first || !$(el).is(':visible') || window.innerWidth < 640) { first = false; return; }
+                clearTimeout(sizeT);
+                sizeT = setTimeout(() => { cfg().winSize = { w: el.offsetWidth, h: el.offsetHeight }; saveSettingsDebounced(); }, 400);
+            }).observe(el);
+        }
+        placeWindow();
     }
     render();
     $('#and_modal').css('display', 'flex');
+    keepInView(document.getElementById('and_modal'));
 }
-function after() { updatePrompt(); save(); render(); }
+function after() { updatePrompt(); save(); updateBadge(); render(); }
 
 const actions = {
     close() { $('#and_modal').hide(); },
     tab(d) { ui.tab = d.tab; render(); },
     addchar() { const n = String($('#and_newchar').val() || '').trim(); if (!n) return; ch(n); ui.who = n; after(); },
     setmoney() { ch(ui.who).money = Number($('#and_money').val()) || 0; after(); },
-    use(d) { useSub(ui.who, d.sub, 1); after(); },
+    use(d) { if (!(cfg().allowManual || !cfg().autoDetect)) return; useSub(ui.who, d.sub, 1); after(); },
+    hp(d) { const c = ch(ui.who); c.health = clamp(Number(d.d) >= 100 ? 100 : c.health + Number(d.d)); log(t('l_health', { n: ui.who, h: Math.round(c.health) })); after(); },
+    clearheat() { ch(ui.who).heat = 0; after(); },
+    forgive() { const c = ch(ui.who); c.debt = 0; c.creditor = ''; log(t('l_forgive', { n: ui.who })); after(); },
+    resetsub(d) {
+        const s = sb(ch(ui.who), d.sub);
+        Object.assign(s, { dep: 0, tol: 0, last: null, high: 0, uses: 0, treat: null, remit: 0 });
+        log(t('l_reset_sub', { n: ui.who, s: ss(d.sub) })); after();
+    },
+    resetall() {
+        if (!confirm(t('res_confirm', { n: ui.who }))) return;
+        const c = ch(ui.who);
+        for (const s of Object.values(c.subs)) Object.assign(s, { dep: 0, tol: 0, last: null, high: 0, uses: 0, treat: null, remit: 0 });
+        c.health = 100; c.heat = 0;
+        log(t('l_reset_all', { n: ui.who })); after();
+    },
+    pendok(d) {
+        const st = S(), p = (st.pending || []).find((x) => x.id === d.pid);
+        if (!p) return;
+        st.pending = st.pending.filter((x) => x.id !== d.pid);
+        useSub(p.who, p.sub, p.units, 'auto'); after();
+    },
+    penddel(d) { const st = S(); st.pending = (st.pending || []).filter((x) => x.id !== d.pid); after(); },
+    pendall() { const st = S(); for (const p of st.pending || []) useSub(p.who, p.sub, p.units, 'auto'); st.pending = []; after(); },
+    pendclear() { S().pending = []; after(); },
     paydebt() {
         const c = ch(ui.who); const p = Math.min(c.money, c.debt);
         if (p <= 0) return window.toastr?.warning(t('w_nomoney'));
-        c.money -= p; c.debt -= p;
+        phoneBank(ui.who, 'debt', -p, c.creditor); c.money -= p; c.debt -= p;
         if (c.debt < 1) { c.debt = 0; c.creditor = ''; }
         log(t('l_paid', { n: ui.who, p: Math.round(p), c: cfg().currency })); after();
     },
@@ -696,6 +1019,12 @@ const actions = {
             window.toastr?.warning(t('w_scam', { d: dn(dl), g: got, q }));
         }
         sb(c, id).inv += got;
+        if (d.credit) phoneSms(ui.who, dl, 'sms_credit', { a: Math.round(total * 1.25), c: cfg().currency });
+        else {
+            phoneBank(ui.who, sub.legal ? 'purchase' : 'transfer', -total, dn(dl));
+            if (!sub.legal && dl.id !== 'shop') phoneSms(ui.who, dl, 'sms_bought');
+        }
+        if (!sub.legal && cfg().autoChannel) joinChannel(dl, ui.who);
         if (!sub.legal) c.heat = clamp(c.heat + dl.risk * 0.25 * Math.min(q, 4));
         log(t('l_bought', { n: ui.who, g: got, s: ss(id), d: dn(dl), t: total, c: cfg().currency, cr: d.credit ? t('l_credit_sfx') : '' }));
         after();
@@ -705,6 +1034,7 @@ const actions = {
         if (s.inv < q) return window.toastr?.warning(t('w_nostock'));
         const income = Math.round(st.market[id] * 0.75 * (1 + c.rep / 200) * q * rnd(0.9, 1.1));
         s.inv -= q; c.money += income;
+        phoneBank(ui.who, 'income', income);
         if (!SUBS[id].legal) { c.heat = clamp(c.heat + 4 * q); c.rep = clamp(c.rep + 0.5 * q); }
         log(t('l_sold', { n: ui.who, q, s: ss(id), i: income, c: cfg().currency }));
         if (!SUBS[id].legal) pushEvent(`${ui.who} sells illegal substances on the side, risking police attention and dangerous clients.`);
@@ -716,11 +1046,16 @@ const actions = {
         S().dealers.push({ id: 'd' + Date.now(), name, desc: String($('#and_dd').val() || ''), subs, priceMul: Number($('#and_dp').val()) || 1, risk: clamp(Number($('#and_dr').val()) || 20), reliab: 0.8 });
         after();
     },
+    chanjoin(d) { const dl = S().dealers.find((x) => x.id === d.dealer); if (dl) joinChannel(dl, ui.who); after(); },
+    chanleave(d) { const dl = S().dealers.find((x) => x.id === d.dealer); if (dl) leaveChannel(dl, ui.who); after(); },
+    phtest() { phoneTest(ui.who); after(); },
+    phinspect() { phoneInspect(); window.toastr?.info(t('ph_inspected'), 'Alcohol n Drugs'); },
     deldealer(d) { const st = S(); st.dealers = st.dealers.filter((x) => x.id !== d.dealer); after(); },
     treat(d) {
         const c = ch(ui.who), s = sb(c, d.sub), tr = T[d.t];
         if (s.treat || c.money < tr.cost) return;
         c.money -= tr.cost;
+        if (tr.cost) phoneBank(ui.who, 'treatment', -tr.cost, tn(tr.id));
         s.treat = { id: tr.id, left: tr.dur, total: tr.dur, eff: tr.eff, wdMul: tr.wdMul, med: !!tr.med };
         log(t('l_tstart', { n: ui.who, t: tn(tr.id), s: ss(d.sub) }));
         pushEvent(`${ui.who} begins treatment for ${SUBS[d.sub].L.en.name}: ${tr.L.en.name}.`);
@@ -734,7 +1069,93 @@ const actions = {
     },
 };
 
-/* ───────────────────────── Настройки ───────────────────────── */
+const changes = {
+    sethealth(d, v) { const c = ch(ui.who); c.health = clamp(Number(v)); log(t('l_health', { n: ui.who, h: Math.round(c.health) })); after(); },
+    setheat(d, v) { ch(ui.who).heat = clamp(Number(v)); after(); },
+    setdep(d, v) { const s = sb(ch(ui.who), d.sub); s.dep = clamp(Number(v)); if (s.dep > 0 && s.last == null) s.last = S().tick; after(); },
+    settol(d, v) { sb(ch(ui.who), d.sub).tol = clamp(Number(v)); after(); },
+    pendwho(d, v) { const p = (S().pending || []).find((x) => x.id === d.pid); if (p) { p.who = v; save(); } },
+};
+
+/* ───────────────────────── Плавающая кнопка и окно ───────────────────────── */
+const FAB_ICONS = ['fa-wine-bottle', 'fa-martini-glass', 'fa-pills', 'fa-cannabis', 'fa-syringe', 'fa-smoking', 'fa-skull-crossbones'];
+
+function makeDraggable(el, handle, onEnd, onClick) {
+    let sx, sy, ox, oy, down = false, moved = false;
+    handle.addEventListener('pointerdown', (e) => {
+        if (e.button > 0 || e.target.closest('[data-nodrag]')) return;
+        down = true; moved = false; sx = e.clientX; sy = e.clientY;
+        const r = el.getBoundingClientRect(); ox = r.left; oy = r.top;
+        try { handle.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    });
+    handle.addEventListener('pointermove', (e) => {
+        if (!down) return;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (!moved && Math.hypot(dx, dy) < 5) return;
+        moved = true; el.classList.add('dragging');
+        el.style.left = clamp(ox + dx, 0, Math.max(0, window.innerWidth - el.offsetWidth)) + 'px';
+        el.style.top = clamp(oy + dy, 0, Math.max(0, window.innerHeight - 40)) + 'px';
+        el.style.right = 'auto'; el.style.bottom = 'auto';
+    });
+    const end = (e) => {
+        if (!down) return;
+        down = false; el.classList.remove('dragging');
+        try { handle.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+        if (moved) onEnd && onEnd({ x: parseInt(el.style.left, 10), y: parseInt(el.style.top, 10) });
+        else if (onClick) onClick(e);
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+}
+
+function keepInView(el) {
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.left = clamp(r.left, 0, Math.max(0, window.innerWidth - el.offsetWidth)) + 'px';
+    el.style.top = clamp(r.top, 0, Math.max(0, window.innerHeight - 40)) + 'px';
+}
+
+function updateBadge() {
+    const el = document.querySelector('#and_fab .and-badge');
+    if (!el) return;
+    const st = S();
+    const n = (st.pending || []).length;
+    el.textContent = n ? String(n) : '';
+    el.style.display = n ? 'flex' : 'none';
+}
+
+function createFab() {
+    $('#and_fab').remove();
+    if (!cfg().fab) return;
+    const icon = FAB_ICONS.includes(cfg().fabIcon) ? cfg().fabIcon : FAB_ICONS[0];
+    const el = $(`<div id="and_fab" title="Alcohol n Drugs"><i class="fa-solid ${icon}"></i><span class="and-badge"></span></div>`).appendTo('body')[0];
+    const p = cfg().fabPos || { x: window.innerWidth - 66, y: Math.round(window.innerHeight * 0.55) };
+    el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+    keepInView(el);
+    makeDraggable(el, el, (pos) => { cfg().fabPos = pos; saveSettingsDebounced(); }, togglePanel);
+    updateBadge();
+}
+
+function placeWindow() {
+    const el = document.getElementById('and_modal');
+    if (!el) return;
+    const narrow = window.innerWidth < 640;
+    const sz = cfg().winSize;
+    el.style.width = narrow ? Math.min(window.innerWidth - 12, 560) + 'px' : (sz?.w || 520) + 'px';
+    el.style.height = narrow ? Math.round(window.innerHeight * 0.78) + 'px' : (sz?.h || 620) + 'px';
+    const p = cfg().winPos || { x: Math.max(8, window.innerWidth - 560), y: 60 };
+    el.style.left = (narrow ? 6 : p.x) + 'px'; el.style.top = (narrow ? 50 : p.y) + 'px';
+    keepInView(el);
+}
+let sizeT;
+function togglePanel() { if ($('#and_modal').is(':visible')) $('#and_modal').hide(); else openPanel(); }
+function resetLayout() {
+    const c = cfg(); c.fabPos = null; c.winPos = null; c.winSize = null; saveSettingsDebounced();
+    createFab(); if ($('#and_modal').length) placeWindow();
+}
+
+/* ───────────────────────── Настройки ─────────────────────────
+
 function settingsHtml() {
     return `<div class="and-settings"><div class="inline-drawer"><div class="inline-drawer-toggle inline-drawer-header"><b>🍺 Alcohol n Drugs</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
     <div class="inline-drawer-content">
@@ -746,6 +1167,18 @@ function settingsHtml() {
     <label class="checkbox_label"><input type="checkbox" id="and_autopay"> ${t('s_autopay')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_toasts"> ${t('s_toasts')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_minor"> ${t('s_minor')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_manual"> ${t('s_manual')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_confirm"> ${t('s_confirm')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_dialog"> ${t('s_dialog')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_fab_on"> ${t('s_fab')}</label>
+    <label>${t('s_fabicon')} <select id="and_fabicon" class="text_pole">${FAB_ICONS.map((i) => `<option value="${i}">${i.replace('fa-', '')}</option>`).join('')}</select></label>
+    <div class="flex-container"><div id="and_layout" class="menu_button">${t('s_fabreset')}</div></div>
+    <hr><b>${t('s_phone')}</b>
+    <label class="checkbox_label"><input type="checkbox" id="and_phone"> ${t('s_phone')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_phbank"> ${t('s_ph_bank')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_phsms"> ${t('s_ph_sms')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_phchan"> ${t('s_ph_chan')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_autochan"> ${t('s_ph_auto')}</label><hr>
     <label>${t('s_diff')}
       <select id="and_diff" class="text_pole"><option value="0.5">${t('d_easy')}</option><option value="1">${t('d_norm')}</option><option value="1.5">${t('d_hard')}</option><option value="2">${t('d_brutal')}</option></select></label>
     <label>${t('s_depth')} <input type="number" id="and_depth" class="text_pole" min="0" max="10"></label>
@@ -770,12 +1203,23 @@ function bindSettings() {
     $('#and_autopay').prop('checked', c.autoPay).on('change', function () { c.autoPay = this.checked; saveSettingsDebounced(); });
     $('#and_toasts').prop('checked', c.toasts).on('change', function () { c.toasts = this.checked; saveSettingsDebounced(); });
     $('#and_minor').prop('checked', c.minorSafe).on('change', function () { c.minorSafe = this.checked; saveSettingsDebounced(); updatePrompt(); });
+    $('#and_manual').prop('checked', c.allowManual).on('change', function () { c.allowManual = this.checked; saveSettingsDebounced(); render(); });
+    $('#and_confirm').prop('checked', c.confirmMode).on('change', function () { c.confirmMode = this.checked; saveSettingsDebounced(); });
+    $('#and_dialog').prop('checked', c.skipDialogue).on('change', function () { c.skipDialogue = this.checked; saveSettingsDebounced(); });
+    $('#and_fab_on').prop('checked', c.fab).on('change', function () { c.fab = this.checked; saveSettingsDebounced(); createFab(); });
+    $('#and_fabicon').val(c.fabIcon).on('change', function () { c.fabIcon = this.value; saveSettingsDebounced(); createFab(); });
+    $('#and_layout').on('click', resetLayout);
+    $('#and_phone').prop('checked', c.phone).on('change', function () { c.phone = this.checked; saveSettingsDebounced(); });
+    $('#and_phbank').prop('checked', c.phoneBank).on('change', function () { c.phoneBank = this.checked; saveSettingsDebounced(); });
+    $('#and_phsms').prop('checked', c.phoneSms).on('change', function () { c.phoneSms = this.checked; saveSettingsDebounced(); });
+    $('#and_phchan').prop('checked', c.phoneChannels).on('change', function () { c.phoneChannels = this.checked; saveSettingsDebounced(); });
+    $('#and_autochan').prop('checked', c.autoChannel).on('change', function () { c.autoChannel = this.checked; saveSettingsDebounced(); });
     $('#and_diff').val(String(c.difficulty)).on('change', function () { c.difficulty = Number(this.value); saveSettingsDebounced(); });
     $('#and_depth').val(c.depth).on('input', function () { c.depth = Number(this.value) || 0; saveSettingsDebounced(); updatePrompt(); });
     $('#and_ticks').val(c.ticks).on('input', function () { c.ticks = Math.max(1, Number(this.value) || 1); saveSettingsDebounced(); });
     $('#and_cur').val(c.currency).on('input', function () { c.currency = this.value || '$'; saveSettingsDebounced(); });
     $('#and_start').val(c.startMoney).on('input', function () { c.startMoney = Number(this.value) || 0; saveSettingsDebounced(); });
-    $('#and_open').on('click', openPanel);
+    $('#and_open').on('click', () => { openPanel(); });
     $('#and_reset').on('click', () => {
         if (!confirm(t('reset_confirm'))) return;
         const md = getContext().chatMetadata; if (md) delete md[MOD];
@@ -791,15 +1235,30 @@ jQuery(() => {
     $('#extensions_settings2').append(settingsHtml());
     bindSettings();
     $('#extensionsMenu').append(`<div id="and_wand" class="list-group-item flex-container flexGap5"><div class="fa-solid fa-wine-bottle extensionsMenuExtensionButton"></div><span class="and-wand-label">Alcohol n Drugs</span></div>`);
-    $('#and_wand').on('click', openPanel);
+    $('#and_wand').on('click', togglePanel);
+    createFab();
 
     $(document).on('click', '#and_modal [data-act]', function () { const f = actions[this.dataset.act]; if (f) f(this.dataset, this); });
     $(document).on('change', '#and_who', function () { ui.who = this.value; render(); });
-    $(document).on('mousedown', '#and_modal', function (e) { if (e.target === this) $(this).hide(); });
+    $(document).on('change', '#and_modal [data-chg]', function () { const f = changes[this.dataset.chg]; if (f) f(this.dataset, this.value, this); });
+    window.addEventListener('resize', () => { keepInView(document.getElementById('and_fab')); if ($('#and_modal').is(':visible')) placeWindow(); });
 
     eventSource.on(event_types.MESSAGE_SENT, (id) => onMessage(id));
     eventSource.on(event_types.MESSAGE_RECEIVED, (id, type) => onMessage(id, type));
-    eventSource.on(event_types.CHAT_CHANGED, () => { fallback = null; ui.who = null; updatePrompt(); if ($('#and_modal').is(':visible')) render(); });
+    eventSource.on(event_types.CHAT_CHANGED, () => { fallback = null; ui.who = null; updatePrompt(); updateBadge(); if ($('#and_modal').is(':visible')) render(); });
+    window.AlcoholNDrugs = {
+        version: '1.3.0',
+        getState: () => S(),
+        phone: {
+            registerAdapter(a) { if (a && a.name && !ADAPTERS.find((x) => x.name === a.name)) ADAPTERS.push(a); return ADAPTERS.length; },
+            adapters: () => ADAPTERS.map((a) => a.name),
+            on(fn) { window.addEventListener('alcohol-n-drugs:phone', (e) => fn(e.detail)); },
+            feed: () => S().phone?.feed || [],
+            inspect: phoneInspect,
+            test: (who) => phoneTest(who || getContext().name1),
+        },
+    };
+    import('./phone-adapters.js').catch((e) => console.debug('[AND] no phone-adapters.js', e));
     updatePrompt();
     console.log('[Alcohol n Drugs] loaded');
 });
