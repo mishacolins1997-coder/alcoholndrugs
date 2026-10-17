@@ -11,6 +11,7 @@ const DEFAULTS = {
     enabled: true, autoDetect: true, events: true, toasts: true, autoPay: true,
     difficulty: 1, depth: 1, ticks: 1, currency: '$', startMoney: 500, minorSafe: true,
     allowManual: false, confirmMode: false, skipDialogue: true, fab: true, fabIcon: 'fa-wine-bottle', fabPos: null, winPos: null, winSize: null,
+    phonePrompt: true, phoneStBank: true,
     phone: true, phoneBank: true, phoneSms: true, phoneChannels: true, autoChannel: true,
     lang: (navigator.language || 'en').toLowerCase().startsWith('ru') ? 'ru' : 'en',
 };
@@ -145,6 +146,24 @@ Object.assign(I18N.en, {
     manual_off: 'Dependence grows only from use mentioned in posts.',
     s_manual: 'Allow the manual "Use" button (otherwise only from post text)', s_confirm: 'Confirm detected use manually',
     s_dialog: 'Ignore quoted dialogue when scanning', s_fab: 'Floating button', s_fabicon: 'Button icon', s_fabreset: 'Reset button and window position',
+});
+Object.assign(I18N.ru, {
+    ph_found: 'Phone-ST найден: {p}', ph_nf: 'Phone-ST не найден (не установлен или ещё не загрузился).',
+    ph_bank_ok: 'Банк Phone-ST найден: {p}', ph_bank_no: 'Банк Phone-ST пока не найден — нажмите «Диагностика».',
+    ph_last: 'Последняя запись в банк: {x}', ph_test_bank: '🧪 Тест: −1 в банк Phone-ST', ph_diag: '🔍 Диагностика Phone-ST', ph_copy: 'Копировать отчёт',
+    ph_copied: 'Отчёт скопирован', ph_wait: 'Собираю данные…',
+    ph_note: 'Банк Phone-ST принадлежит {{user}}: списания и поступления {{user}} записываются в него. SMS и каналы дилеров попадают в сюжет через промпт — модель показывает их на экране телефона. Уведомления других персонажей остаются в ленте ниже.',
+    ph_ok_dep: '✅ {p}: баланс {a} → {b}{h}', ph_hist_yes: ', операция записана', ph_hist_no: ', без записи в историю',
+    s_ph_prompt: 'Передавать уведомления телефона в сюжет (промпт)', s_ph_stbank: 'Автоматически писать в банк Phone-ST',
+});
+Object.assign(I18N.en, {
+    ph_found: 'Phone-ST found: {p}', ph_nf: 'Phone-ST not found (not installed or not loaded yet).',
+    ph_bank_ok: 'Phone-ST bank found: {p}', ph_bank_no: 'Phone-ST bank not found yet — press "Diagnostics".',
+    ph_last: 'Last bank write: {x}', ph_test_bank: '🧪 Test: −1 in the Phone-ST bank', ph_diag: '🔍 Phone-ST diagnostics', ph_copy: 'Copy report',
+    ph_copied: 'Report copied', ph_wait: 'Collecting data…',
+    ph_note: "The Phone-ST bank belongs to {{user}}: {{user}}'s debits and credits are written to it. Dealer SMS and channels reach the story through the prompt — the model shows them on the phone screen. Other characters' notifications stay in the feed below.",
+    ph_ok_dep: '✅ {p}: balance {a} → {b}{h}', ph_hist_yes: ', transaction recorded', ph_hist_no: ', no history entry',
+    s_ph_prompt: 'Pass phone notifications to the story (prompt)', s_ph_stbank: 'Automatically write to the Phone-ST bank',
 });
 const lang = () => (I18N[cfg().lang] ? cfg().lang : 'en');
 const t = (k, p = {}) => String(I18N[lang()][k] ?? I18N.en[k] ?? k).replace(/\{(\w+)\}/g, (_, x) => (p[x] ?? ''));
@@ -453,6 +472,14 @@ function emitPhone(item) {
         try { if (a.detect && !a.detect()) continue; if (typeof a[item.kind] === 'function') a[item.kind](item); }
         catch (e) { console.warn('[AND] phone adapter', a.name, e); }
     }
+    try {
+        const nc = ch(item.who);
+        nc.notices = nc.notices || [];
+        const nt = item.kind === 'bank' ? `Bank: ${item.text}` : item.kind === 'sms' ? `SMS from ${item.from}: "${item.text}"` : `Channel "${item.channel}" — ${item.text}`;
+        nc.notices.unshift({ text: nt, left: 6 });
+        nc.notices = nc.notices.slice(0, 5);
+    } catch (e) { /* ignore */ }
+    try { getContext().eventSource.emit('alcohol_n_drugs_' + item.kind, item); } catch (e) { /* ignore */ }
     toast(`${item.kind === 'bank' ? '🏦' : item.kind === 'sms' ? '💬' : '📢'} ${item.from}: ${item.text}`);
 }
 function phoneBank(who, type, amount, merchant = '') {
@@ -506,6 +533,173 @@ function phoneTest(who) {
     joinChannel(d, who);
     channelPost(d, t('ch_price', { list: d.subs.map((id) => `${ss(id)} ${cfg().currency}${Math.round(S().market[id] * d.priceMul)}`).join(' · ') }));
 }
+
+/* ───────────────────────── Phone-ST: поиск банка и запись (эвристика) ───────────────────────── */
+const PS = { base: null, mods: {}, errors: {}, last: '', bankPath: '' };
+async function findPhoneBase() {
+    if (PS.base) return PS.base;
+    try {
+        const hit = Array.from(document.querySelectorAll('script[src]')).map((x) => x.src)
+            .find((u) => /third-party\/[^/]*phone[^/]*\/index\.js/i.test(u) && !/career|alcohol/i.test(u));
+        if (hit) return (PS.base = hit.slice(0, hit.lastIndexOf('/') + 1));
+    } catch (e) { /* ignore */ }
+    try {
+        const ctx = getContext();
+        const r = await fetch('/api/extensions/discover', { headers: (ctx.getRequestHeaders && ctx.getRequestHeaders()) || {} });
+        if (r.ok) {
+            const x = (await r.json()).find((i) => /phone/i.test(i.name) && !/career|alcohol/i.test(i.name));
+            if (x) return (PS.base = `${location.origin}/scripts/extensions/${String(x.name).replace(/^\//, '')}/`);
+        }
+    } catch (e) { /* ignore */ }
+    return null;
+}
+async function loadPhoneMods() {
+    const base = await findPhoneBase();
+    if (!base) return null;
+    for (const f of ['state', 'bank', 'social', 'shop', 'discord', 'prompts']) { // вспомогательные модули — их уже загрузил сам Phone-ST
+        if (PS.mods[f] !== undefined) continue;
+        try { PS.mods[f] = await import(/* webpackIgnore: true */ base + f + '.js'); } catch (err) { PS.mods[f] = null; PS.errors[f] = String(err.message || err).slice(0, 100); }
+    }
+    return PS.mods;
+}
+const numLike = (x) => typeof x === 'number' || (typeof x === 'string' && /^-?[\d\s.,]+$/.test(x.trim()) && x.trim() !== '');
+function scanBank(root, path, out, depth, seen) {
+    if (!root || typeof root !== 'object' || depth > 4 || seen.has(root)) return;
+    seen.add(root);
+    for (const k of Object.keys(root).slice(0, 80)) {
+        let v; try { v = root[k]; } catch (e) { continue; }
+        if (!v || typeof v !== 'object') continue;
+        const p = `${path}.${k}`;
+        const balKey = Object.keys(v).find((x) => /^(balance|money|cash|funds)$/i.test(x) && numLike(v[x]));
+        if (balKey && /bank|wallet|account|card|finance|money/i.test(p)) out.push({ ref: v, path: p, balKey });
+        scanBank(v, p, out, depth + 1, seen);
+    }
+}
+function findBankCandidates() {
+    const out = [], seen = new WeakSet();
+    for (const [f, m] of Object.entries(PS.mods)) {
+        if (!m) continue;
+        for (const [k, v] of Object.entries(m)) {
+            if (v && typeof v === 'object') scanBank({ [k]: v }, f, out, 0, seen);
+            else if (typeof v === 'function' && v.length === 0 && /state|data|store|get/i.test(k)) { try { const r = v(); if (r && typeof r === 'object') scanBank({ [k]: r }, f, out, 0, seen); } catch (e) { /* ignore */ } }
+        }
+    }
+    try { scanBank(getContext().chatMetadata, 'chatMetadata', out, 0, seen); } catch (e) { /* ignore */ }
+    try { const ex = { ...getContext().extensionSettings }; delete ex[MOD]; scanBank(ex, 'extensionSettings', out, 0, seen); } catch (e) { /* ignore */ }
+    const score = (b) => (/bank/i.test(b.path) ? 2 : 0) + (Object.values(b.ref).some(Array.isArray) ? 1 : 0);
+    return out.sort((a, b) => score(b) - score(a));
+}
+function makeTx(sample, arr, amount, memo) {
+    const num = (v) => parseFloat(String(v).replace(/\s/g, '').replace(',', '.'));
+    const id = 'and' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const nowIso = new Date().toISOString();
+    if (!sample || typeof sample !== 'object') return { id, type: amount >= 0 ? 'income' : 'expense', amount, title: memo, text: memo, date: nowIso, timestamp: Date.now() };
+    const amountKey = Object.keys(sample).find((k) => /amount|sum|value|total|price/i.test(k) && numLike(sample[k]));
+    const signed = amountKey ? arr.some((x) => numLike(x[amountKey]) && num(x[amountKey]) < 0) : false;
+    const typeKey = Object.keys(sample).find((k) => /^(type|kind|direction|dir)$/i.test(k) && typeof sample[k] === 'string');
+    const tx = {}; let memoUsed = false;
+    for (const [k, v] of Object.entries(sample)) {
+        if (/^(id|uid)$/i.test(k)) tx[k] = typeof v === 'number' ? Date.now() : id;
+        else if (k === amountKey) { const a = signed ? amount : Math.abs(amount); tx[k] = typeof v === 'number' ? a : String(a); }
+        else if (k === typeKey) {
+            const vals = [...new Set(arr.map((x) => x[typeKey]).filter((x) => typeof x === 'string'))];
+            const want = amount >= 0 ? /^(in|income|deposit|credit|receive|received|plus|\+|incoming|доход|пополнение)$/i : /^(out|expense|debit|pay|payment|spend|minus|-|outgoing|расход|списание)$/i;
+            tx[k] = vals.find((x) => want.test(x)) || (amount >= 0 ? 'income' : 'expense');
+        } else if (/date|time|^ts$|^at$|created|timestamp/i.test(k)) {
+            tx[k] = typeof v === 'number' ? (v < 1e12 ? Math.floor(Date.now() / 1000) : Date.now()) : (/^\d{4}-\d\d-\d\dT/.test(String(v)) ? nowIso : new Date().toLocaleString());
+        } else if (!memoUsed && typeof v === 'string' && /title|desc|memo|text|name|note|merchant|from|source|label|comment|reason/i.test(k)) { tx[k] = memo; memoUsed = true; }
+        else tx[k] = v;
+    }
+    return tx;
+}
+async function phoneStDeposit(amount, memo) {
+    await loadPhoneMods();
+    const c = findBankCandidates();
+    if (!c.length) throw new Error(lang() === 'ru' ? 'банк Phone-ST не найден (нужна диагностика)' : 'Phone-ST bank not found (run diagnostics)');
+    const b = c[0];
+    const cur = parseFloat(String(b.ref[b.balKey]).replace(/\s/g, '').replace(',', '.'));
+    const next = Math.max(0, Math.round((cur + amount) * 100) / 100); // баланс не уходит в минус
+    b.ref[b.balKey] = typeof b.ref[b.balKey] === 'string' ? String(next) : next;
+    const txKey = Object.keys(b.ref).find((k) => Array.isArray(b.ref[k]) && /trans|hist|tx|oper|log|record|statement|list/i.test(k));
+    if (txKey) {
+        const arr = b.ref[txKey]; const tx = makeTx(arr[0], arr, amount, memo);
+        let newestFirst = true;
+        const dk = arr.length > 1 && Object.keys(arr[0] || {}).find((k) => /date|time|^ts$|^at$|created|timestamp/i.test(k));
+        if (dk) { const tm = (x) => (typeof x === 'number' ? x : Date.parse(x)); const a = tm(arr[0][dk]), z = tm(arr[arr.length - 1][dk]); if (!isNaN(a) && !isNaN(z) && a < z) newestFirst = false; }
+        if (newestFirst) arr.unshift(tx); else arr.push(tx);
+    }
+    for (const m of Object.values(PS.mods)) { if (!m) continue; for (const [k, v] of Object.entries(m)) if (typeof v === 'function' && v.length === 0 && /^(save|persist|commit|store|write)/i.test(k)) { try { v(); } catch (e) { /* ignore */ } } }
+    try { getContext().saveMetadata(); } catch (e) { /* ignore */ }
+    PS.bankPath = b.path;
+    return { path: b.path, from: cur, to: next, tx: !!txKey };
+}
+function psRefresh() { try { if ($('#and_modal').is(':visible')) render(); } catch (e) { /* ignore */ } }
+function phoneStBankWrite(item) {
+    const ctx = getContext();
+    if (!cfg().phoneStBank || item.who !== ctx.name1) return;
+    const memo = t('b_' + item.type, { m: item.merchant || '' });
+    phoneStDeposit(item.amount, memo)
+        .then((r) => { PS.last = t('ph_ok_dep', { p: r.path, a: r.from, b: r.to, h: r.tx ? t('ph_hist_yes') : t('ph_hist_no') }); psRefresh(); })
+        .catch((err) => { PS.last = '⚠️ ' + err.message; console.warn('[AND] Phone-ST:', err.message); psRefresh(); });
+}
+// поиск похожих на мессенджер / каналы структур (только для диагностики)
+function scanGeneric(root, path, re, out, depth, seen) {
+    if (!root || typeof root !== 'object' || depth > 5 || seen.has(root) || out.length > 14) return;
+    seen.add(root);
+    for (const k of Object.keys(root).slice(0, 60)) {
+        let v; try { v = root[k]; } catch (e) { continue; }
+        if (!v || typeof v !== 'object') continue;
+        const p = `${path}.${k}`;
+        if (re.test(k)) {
+            if (Array.isArray(v) && v.length && typeof v[0] === 'object') out.push(`${p} [array len ${v.length}] sample: ${JSON.stringify(v[0]).slice(0, 260)}`);
+            else if (!Array.isArray(v)) out.push(`${p} [object keys: ${Object.keys(v).slice(0, 12).join(',')}] sample: ${JSON.stringify(Object.values(v)[0] ?? null).slice(0, 260)}`);
+        }
+        scanGeneric(v, p, re, out, depth + 1, seen);
+    }
+}
+async function phoneDiagnose() {
+    const out = ['Alcohol n Drugs — Phone-ST diagnostics (v1.5.0)'];
+    try {
+        const mods = await loadPhoneMods();
+        out.push('Phone-ST base: ' + (PS.base || 'NOT FOUND'));
+        for (const [f, m] of Object.entries(mods || {})) {
+            if (!m) { out.push(`-- ${f}.js: not loaded (${PS.errors[f] || ''})`); continue; }
+            out.push(`-- ${f}.js exports:`);
+            for (const [k, v] of Object.entries(m).slice(0, 70)) {
+                if (typeof v === 'function') out.push(`  fn ${k}(${v.length}): ${v.toString().replace(/\s+/g, ' ').slice(0, 130)}`);
+                else if (v && typeof v === 'object') out.push(`  obj ${k}: keys ${Object.keys(v).slice(0, 25).join(',')}`);
+                else out.push(`  ${typeof v} ${k}`);
+            }
+        }
+        const c = findBankCandidates();
+        out.push(c.length ? c.slice(0, 3).map((b) => `BANK candidate: ${b.path} (${b.balKey}=${b.ref[b.balKey]}) keys: ${Object.keys(b.ref).join(',')} sample tx: ${JSON.stringify((Object.values(b.ref).find(Array.isArray) || [])[0] ?? null).slice(0, 300)}`).join('\n') : 'BANK candidate: none');
+        const roots = [];
+        for (const [f, m] of Object.entries(mods || {})) {
+            if (!m) continue;
+            for (const [k, v] of Object.entries(m)) {
+                if (v && typeof v === 'object') roots.push([`${f}.${k}`, v]);
+                else if (typeof v === 'function' && v.length === 0 && /state|data|store|get/i.test(k)) { try { const r = v(); if (r && typeof r === 'object') roots.push([`${f}.${k}()`, r]); } catch (e) { /* ignore */ } }
+            }
+        }
+        try { roots.push(['chatMetadata', getContext().chatMetadata]); } catch (e) { /* ignore */ }
+        try { roots.push(['extensionSettings', { ...getContext().extensionSettings }]); } catch (e) { /* ignore */ }
+        for (const [label, re] of [['MESSENGER', /sms|messag|messenger|chat|conversation|thread|dialog|inbox|contact/i], ['CHANNELS', /channel|server|guild|discord|telegram|\btg\b|community/i]]) {
+            const res = [], seen = new WeakSet();
+            for (const [pth, r] of roots) scanGeneric({ x: r }, pth, re, res, 0, seen);
+            out.push(`${label} candidates:` + (res.length ? '\n  ' + res.slice(0, 12).join('\n  ') : ' none'));
+        }
+    } catch (err) { out.push('error: ' + err.message); }
+    try { out.push('window globals: ' + Object.keys(window).filter((x) => /phone|bank|pst|discord/i.test(x) && x !== 'AlcoholNDrugs').slice(0, 12).join(', ')); } catch (e) { /* ignore */ }
+    try { out.push('chatMetadata keys: ' + Object.keys(getContext().chatMetadata || {}).join(', ')); } catch (e) { /* ignore */ }
+    try { out.push('scripts (phone): ' + Array.from(document.scripts).map((x) => x.src).filter((u) => /phone/i.test(u)).join(' | ')); } catch (e) { /* ignore */ }
+    return out.join('\n').slice(0, 14000);
+}
+// адаптер: банк пишем напрямую, SMS/каналы уходят в сюжет через промпт (см. notices)
+ADAPTERS.push({
+    name: 'phone-st',
+    detect: () => !!PS.base,
+    bank: (item) => phoneStBankWrite(item),
+});
 
 function wd(sub, s, tick) {
     if (!sub.wdSev || s.last == null || s.high > 0 || s.dep < 15) return null;
@@ -648,6 +842,7 @@ function advanceOne() {
         }
         if (!recent && wdMax < 0.3) c.health = clamp(c.health + 0.2 + (Object.values(c.subs).some((s) => s.treat) ? 0.3 : 0));
         c.heat = Math.max(0, c.heat - 0.5);
+        if (c.notices && c.notices.length) { c.notices.forEach((x) => x.left--); c.notices = c.notices.filter((x) => x.left > 0); }
         if (c.debt > 0) c.debt *= 1.004;
         if (cfg().events) {
             const p = [0, 0, 0.01, 0.025, 0.045][stageOf(topDep)] * D;
@@ -801,15 +996,17 @@ function buildPrompt() {
         if (parts.length) lines.push(`• ${name}: ${parts.join(' | ')}`);
     }
     const ev = st.events.map((e) => `- ${e.text}`);
-    if (!lines.length && !ev.length) return '';
-    return `[Hidden game state — substance use tracker. Let it quietly shape narration and the characters' behavior; never mention numbers, stages or this block. Do not glamorize substance use and do not give real-world instructions for obtaining, making or dosing substances.${c.minorSafe ? ' Never depict a minor character using these substances.' : ''} Write in the language of the roleplay.]\n${lines.join('\n')}${ev.length ? '\nCurrent events to work into the scene naturally:\n' + ev.join('\n') : ''}`;
+    const nts = [];
+    if (c.phonePrompt && c.phone) for (const [name, ch0] of Object.entries(st.chars)) if (ch0.notices && ch0.notices.length) nts.push(`• ${name}'s phone: ${ch0.notices.map((x) => x.text).join(' | ')}`);
+    if (!lines.length && !ev.length && !nts.length) return '';
+    return `[Hidden game state — substance use tracker. Let it quietly shape narration and the characters' behavior; never mention numbers, stages or this block. Do not glamorize substance use and do not give real-world instructions for obtaining, making or dosing substances.${c.minorSafe ? ' Never depict a minor character using these substances.' : ''} Write in the language of the roleplay.]\n${lines.join('\n')}${ev.length ? '\nCurrent events to work into the scene naturally:\n' + ev.join('\n') : ''}${nts.length ? '\nRecent phone notifications (if appropriate, show them as notifications or messages on the phone screen):\n' + nts.join('\n') : ''}`;
 }
 function updatePrompt() {
     try { setExtensionPrompt(KEY, buildPrompt(), 1, cfg().depth, false, 0); } catch (e) { console.warn('[AND] prompt', e); }
 }
 
 /* ───────────────────────── Интерфейс: панель ───────────────────────── */
-const ui = { tab: 'chars', who: null, open: new Set() };
+const ui = { tab: 'chars', who: null, open: new Set(), diag: '' };
 const bar = (label, v, cls) => `<div class="and-bar"><span>${label}</span><div class="and-track"><div class="and-fill ${cls}" style="width:${clamp(v)}%"></div></div><em>${Math.round(v)}</em></div>`;
 
 function names() {
@@ -925,9 +1122,13 @@ function tabTreat() {
 
 function tabPhone() {
     const st = S(), feed = (st.phone?.feed || []).filter((i) => i.who === ui.who);
-    const n = ADAPTERS.filter((a) => !a.detect || a.detect()).length;
-    let h = whoBar() + `<div class="and-note">${n ? t('ph_adapters', { n }) : t('ph_none')}</div>
-    <div class="and-sell"><button data-act="phtest">${t('ph_test')}</button><button data-act="phinspect">${t('ph_inspect')}</button></div>`;
+    const bankOk = !!PS.bankPath;
+    let h = whoBar() + `<div class="and-card"><div class="and-note">${PS.base ? t('ph_found', { p: esc(PS.base) }) : t('ph_nf')}</div>
+    <div class="and-note">${bankOk ? t('ph_bank_ok', { p: esc(PS.bankPath) }) : t('ph_bank_no')}</div>
+    ${PS.last ? `<div class="and-note">${t('ph_last', { x: esc(PS.last) })}</div>` : ''}
+    <div class="and-note">${t('ph_note')}</div>
+    <div class="and-sell"><button data-act="psbanktest">${t('ph_test_bank')}</button><button data-act="phtest">${t('ph_test')}</button><button data-act="psdiag">${t('ph_diag')}</button></div>
+    ${ui.diag ? `<textarea id="and_diag" readonly rows="10" style="width:100%;margin-top:6px;font-size:.78em">${esc(ui.diag)}</textarea><button data-act="psdiagcopy">${t('ph_copy')}</button>` : ''}</div>`;
     if (!feed.length) return h + `<div class="and-note">${t('ph_empty')}</div>`;
     return h + feed.slice(0, 60).map((i) => `<div class="and-card and-ph ${i.kind}"><div class="and-card-h"><b>${i.kind === 'bank' ? '🏦' : i.kind === 'sms' ? '💬' : '📢'} ${esc(i.channel ? i.channel : i.from)}</b><span class="and-tag">#${i.t}</span></div><div>${esc(i.text)}</div></div>`).join('');
 }
@@ -1051,6 +1252,13 @@ const actions = {
     chanleave(d) { const dl = S().dealers.find((x) => x.id === d.dealer); if (dl) leaveChannel(dl, ui.who); after(); },
     phtest() { phoneTest(ui.who); after(); },
     phinspect() { phoneInspect(); window.toastr?.info(t('ph_inspected'), 'Alcohol n Drugs'); },
+    psbanktest() {
+        phoneStDeposit(-1, 'Alcohol n Drugs test')
+            .then((r) => { PS.last = t('ph_ok_dep', { p: r.path, a: r.from, b: r.to, h: r.tx ? t('ph_hist_yes') : t('ph_hist_no') }); render(); })
+            .catch((err) => { PS.last = '⚠️ ' + err.message; render(); });
+    },
+    async psdiag() { ui.diag = t('ph_wait'); render(); ui.diag = await phoneDiagnose(); console.log('[Alcohol n Drugs]\n' + ui.diag); render(); },
+    psdiagcopy() { const el = document.getElementById('and_diag'); try { navigator.clipboard.writeText(ui.diag); } catch (e) { if (el) { el.select(); document.execCommand('copy'); } } window.toastr?.success(t('ph_copied'), 'Alcohol n Drugs'); },
     deldealer(d) { const st = S(); st.dealers = st.dealers.filter((x) => x.id !== d.dealer); after(); },
     treat(d) {
         const c = ch(ui.who), s = sb(c, d.sub), tr = T[d.t];
@@ -1177,6 +1385,8 @@ function settingsHtml() {
     <hr><b>${t('s_phone')}</b>
     <label class="checkbox_label"><input type="checkbox" id="and_phone"> ${t('s_phone')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_phbank"> ${t('s_ph_bank')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_stbank"> ${t('s_ph_stbank')}</label>
+    <label class="checkbox_label"><input type="checkbox" id="and_phprompt"> ${t('s_ph_prompt')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_phsms"> ${t('s_ph_sms')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_phchan"> ${t('s_ph_chan')}</label>
     <label class="checkbox_label"><input type="checkbox" id="and_autochan"> ${t('s_ph_auto')}</label><hr>
@@ -1211,6 +1421,8 @@ function bindSettings() {
     $('#and_fabicon').val(c.fabIcon).on('change', function () { c.fabIcon = this.value; saveSettingsDebounced(); createFab(); });
     $('#and_layout').on('click', resetLayout);
     $('#and_phone').prop('checked', c.phone).on('change', function () { c.phone = this.checked; saveSettingsDebounced(); });
+    $('#and_stbank').prop('checked', c.phoneStBank).on('change', function () { c.phoneStBank = this.checked; saveSettingsDebounced(); });
+    $('#and_phprompt').prop('checked', c.phonePrompt).on('change', function () { c.phonePrompt = this.checked; saveSettingsDebounced(); updatePrompt(); });
     $('#and_phbank').prop('checked', c.phoneBank).on('change', function () { c.phoneBank = this.checked; saveSettingsDebounced(); });
     $('#and_phsms').prop('checked', c.phoneSms).on('change', function () { c.phoneSms = this.checked; saveSettingsDebounced(); });
     $('#and_phchan').prop('checked', c.phoneChannels).on('change', function () { c.phoneChannels = this.checked; saveSettingsDebounced(); });
@@ -1249,7 +1461,7 @@ jQuery(() => {
     eventSource.on(event_types.MESSAGE_RECEIVED, (id, type) => onMessage(id, type));
     eventSource.on(event_types.CHAT_CHANGED, () => { fallback = null; ui.who = null; updatePrompt(); updateBadge(); if ($('#and_modal').is(':visible')) render(); });
     window.AlcoholNDrugs = {
-        version: '1.3.1',
+        version: '1.5.0',
         getState: () => S(),
         phone: {
             registerAdapter(a) { if (a && a.name && !ADAPTERS.find((x) => x.name === a.name)) ADAPTERS.push(a); return ADAPTERS.length; },
@@ -1261,6 +1473,9 @@ jQuery(() => {
         },
     };
     import('./phone-adapters.js').catch((e) => console.debug('[AND] no phone-adapters.js', e));
+    // Phone-ST может загрузиться позже нас — ищем его с задержкой и повторяем
+    const psProbe = async (n) => { try { await loadPhoneMods(); if (PS.base) { findBankCandidates()[0] && (PS.bankPath = findBankCandidates()[0].path); psRefresh(); return; } } catch (e) { /* ignore */ } if (n > 0) setTimeout(() => psProbe(n - 1), 4000); };
+    setTimeout(() => psProbe(5), 2500);
     updatePrompt();
     console.log('[Alcohol n Drugs] loaded');
 });
