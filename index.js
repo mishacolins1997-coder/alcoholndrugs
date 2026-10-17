@@ -953,8 +953,9 @@ function openPanel() {
     if (!$('#and_modal').length) {
         $('body').append(`<div id="and_modal"><div class="and-head"><b>🍺 Alcohol n Drugs</b><span class="and-x" data-act="close" data-nodrag>✕</span></div><div class="and-tabs"></div><div class="and-body"></div></div>`);
         const el = document.getElementById('and_modal');
-        makeDraggable(el, el.querySelector('.and-head'), (pos) => { cfg().winPos = pos; saveSettingsDebounced(); });
-        if (window.ResizeObserver) {
+        const head = el && el.querySelector('.and-head');
+        if (el && head) makeDraggable(el, head, (pos) => { cfg().winPos = pos; saveSettingsDebounced(); });
+        if (el && window.ResizeObserver) {
             let first = true;
             new ResizeObserver(() => {
                 if (first || !$(el).is(':visible') || window.innerWidth < 640) { first = false; return; }
@@ -1154,7 +1155,7 @@ function resetLayout() {
     createFab(); if ($('#and_modal').length) placeWindow();
 }
 
-/* ───────────────────────── Настройки ─────────────────────────
+/* ───────────────────────── Настройки ───────────────────────── */
 
 function settingsHtml() {
     return `<div class="and-settings"><div class="inline-drawer"><div class="inline-drawer-toggle inline-drawer-header"><b>🍺 Alcohol n Drugs</b><div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div></div>
@@ -1232,11 +1233,12 @@ function applyLangToMenu() { $('#and_wand .and-wand-label').text('Alcohol n Drug
 /* ───────────────────────── Инициализация ───────────────────────── */
 jQuery(() => {
     cfg();
-    $('#extensions_settings2').append(settingsHtml());
-    bindSettings();
+    // 1) пункт в списке расширений — всегда первым и независимо от остального
+    try { $('#extensions_settings2').append(settingsHtml()); bindSettings(); } catch (e) { console.error('[AND] settings', e); }
     $('#extensionsMenu').append(`<div id="and_wand" class="list-group-item flex-container flexGap5"><div class="fa-solid fa-wine-bottle extensionsMenuExtensionButton"></div><span class="and-wand-label">Alcohol n Drugs</span></div>`);
     $('#and_wand').on('click', togglePanel);
-    createFab();
+    // 2) плавающая кнопка — дополнительно, её сбой не мешает остальному
+    try { createFab(); } catch (e) { console.error('[AND] fab', e); }
 
     $(document).on('click', '#and_modal [data-act]', function () { const f = actions[this.dataset.act]; if (f) f(this.dataset, this); });
     $(document).on('change', '#and_who', function () { ui.who = this.value; render(); });
@@ -1247,7 +1249,7 @@ jQuery(() => {
     eventSource.on(event_types.MESSAGE_RECEIVED, (id, type) => onMessage(id, type));
     eventSource.on(event_types.CHAT_CHANGED, () => { fallback = null; ui.who = null; updatePrompt(); updateBadge(); if ($('#and_modal').is(':visible')) render(); });
     window.AlcoholNDrugs = {
-        version: '1.3.0',
+        version: '1.3.1',
         getState: () => S(),
         phone: {
             registerAdapter(a) { if (a && a.name && !ADAPTERS.find((x) => x.name === a.name)) ADAPTERS.push(a); return ADAPTERS.length; },
