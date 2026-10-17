@@ -593,7 +593,7 @@ function makeTx(sample, arr, amount, memo) {
     const num = (v) => parseFloat(String(v).replace(/\s/g, '').replace(',', '.'));
     const id = 'and' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const nowIso = new Date().toISOString();
-    if (!sample || typeof sample !== 'object') return { id, type: amount >= 0 ? 'income' : 'expense', amount, title: memo, text: memo, date: nowIso, timestamp: Date.now() };
+    if (!sample || typeof sample !== 'object') return { id, type: amount >= 0 ? 'income' : 'expense', amount, title: memo, label: memo, description: memo, text: memo, category: 'другое', date: nowIso, timestamp: Date.now() };
     const amountKey = Object.keys(sample).find((k) => /amount|sum|value|total|price/i.test(k) && numLike(sample[k]));
     const signed = amountKey ? arr.some((x) => numLike(x[amountKey]) && num(x[amountKey]) < 0) : false;
     const typeKey = Object.keys(sample).find((k) => /^(type|kind|direction|dir)$/i.test(k) && typeof sample[k] === 'string');
@@ -612,8 +612,46 @@ function makeTx(sample, arr, amount, memo) {
     }
     return tx;
 }
+const PS_SIGN = { flip: false };
+// Основной путь: родной API банка Phone-ST (bank.js → addTransaction), подпись операции идёт в поле label
+async function phoneStApiTx(amount, memo) {
+    await loadPhoneMods();
+    const bk = PS.mods.bank;
+    if (!bk || typeof bk.addTransaction !== 'function' || typeof bk.getBank !== 'function') return null;
+    const bal = () => { const v = parseFloat(String(bk.getBank()?.balance ?? '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(v) ? v : null; };
+    const before = bal();
+    if (before === null) return null;
+    const attempt = async (amt) => { let r = bk.addTransaction({ amount: amt, label: memo, category: 'другое', silent: true }); if (r && typeof r.then === 'function') r = await r; return r; };
+    let tx = await attempt(PS_SIGN.flip ? -amount : amount);
+    let delta = bal() - before;
+    if (Math.abs(delta - amount) > 0.01 && Math.abs(delta + amount) < 0.01) {
+        // у Phone-ST обратная трактовка знака — откатываем запись и пишем с другим знаком
+        const id = tx && typeof tx === 'object' ? tx.id : tx;
+        if (id && typeof bk.deleteTransaction === 'function') { try { bk.deleteTransaction(id); } catch (e) { /* ignore */ } }
+        PS_SIGN.flip = !PS_SIGN.flip;
+        tx = await attempt(PS_SIGN.flip ? -amount : amount);
+        delta = bal() - before;
+    }
+    try { getContext().saveMetadata(); } catch (e) { /* ignore */ }
+    if (Math.abs(delta) < 0.005) throw new Error(lang() === 'ru' ? 'Phone-ST addTransaction не изменил баланс' : 'Phone-ST addTransaction did not change the balance');
+    return { path: 'bank.js · addTransaction()', from: before, to: bal(), tx: true };
+}
+async function phoneStEnsureContact(name) {
+    if (!name || name === '?') return;
+    await loadPhoneMods();
+    const st = PS.mods.state;
+    if (!st || typeof st.addManualContact !== 'function') return;
+    try {
+        const key = typeof st.keyOf === 'function' ? st.keyOf(name) : String(name).toLowerCase();
+        if (typeof st.getThreadList === 'function' && st.getThreadList().some((th) => th.key === key)) return;
+        st.addManualContact(name, typeof st.randomNumber === 'function' ? st.randomNumber() : '');
+        if (typeof st.saveMeta === 'function') st.saveMeta();
+    } catch (e) { console.debug('[AND] ensure contact', e); }
+}
 async function phoneStDeposit(amount, memo) {
     await loadPhoneMods();
+    const viaApi = await phoneStApiTx(amount, memo);
+    if (viaApi) { PS.bankPath = viaApi.path; return viaApi; }
     const c = findBankCandidates();
     if (!c.length) throw new Error(lang() === 'ru' ? 'банк Phone-ST не найден (нужна диагностика)' : 'Phone-ST bank not found (run diagnostics)');
     const b = c[0];
@@ -658,19 +696,23 @@ function scanGeneric(root, path, re, out, depth, seen) {
     }
 }
 async function phoneDiagnose() {
-    const out = ['Alcohol n Drugs — Phone-ST diagnostics (v1.5.0)'];
+    const out = ['Alcohol n Drugs — Phone-ST diagnostics (v1.5.1)'];
     try {
         const mods = await loadPhoneMods();
         out.push('Phone-ST base: ' + (PS.base || 'NOT FOUND'));
-        for (const [f, m] of Object.entries(mods || {})) {
+        const FULL = new Set(['discord', 'prompts']);
+        const ordered = Object.entries(mods || {}).sort((a, b) => (FULL.has(b[0]) ? 1 : 0) - (FULL.has(a[0]) ? 1 : 0));
+        for (const [f, m] of ordered) {
             if (!m) { out.push(`-- ${f}.js: not loaded (${PS.errors[f] || ''})`); continue; }
             out.push(`-- ${f}.js exports:`);
-            for (const [k, v] of Object.entries(m).slice(0, 70)) {
-                if (typeof v === 'function') out.push(`  fn ${k}(${v.length}): ${v.toString().replace(/\s+/g, ' ').slice(0, 130)}`);
+            for (const [k, v] of Object.entries(m)) {
+                if (typeof v === 'function') out.push(FULL.has(f) ? `  fn ${k}(${v.length}): ${v.toString().replace(/\s+/g, ' ').slice(0, 700)}` : `  fn ${k}(${v.length})`);
                 else if (v && typeof v === 'object') out.push(`  obj ${k}: keys ${Object.keys(v).slice(0, 25).join(',')}`);
                 else out.push(`  ${typeof v} ${k}`);
             }
         }
+        for (const k of ['getPhoneMessageText', 'isAppJournal', 'getRoleplaySmsOptions', 'addManualContact', 'scanChat']) { const fnn = mods?.state?.[k]; if (typeof fnn === 'function') out.push(`SRC state.${k}: ` + fnn.toString().replace(/\s+/g, ' ').slice(0, 900)); }
+        for (const k of ['addTransaction', 'bankInjectRule', 'harvestBankTags']) { const fnn = mods?.bank?.[k]; if (typeof fnn === 'function') out.push(`SRC bank.${k}: ` + fnn.toString().replace(/\s+/g, ' ').slice(0, 900)); }
         const c = findBankCandidates();
         out.push(c.length ? c.slice(0, 3).map((b) => `BANK candidate: ${b.path} (${b.balKey}=${b.ref[b.balKey]}) keys: ${Object.keys(b.ref).join(',')} sample tx: ${JSON.stringify((Object.values(b.ref).find(Array.isArray) || [])[0] ?? null).slice(0, 300)}`).join('\n') : 'BANK candidate: none');
         const roots = [];
@@ -692,13 +734,15 @@ async function phoneDiagnose() {
     try { out.push('window globals: ' + Object.keys(window).filter((x) => /phone|bank|pst|discord/i.test(x) && x !== 'AlcoholNDrugs').slice(0, 12).join(', ')); } catch (e) { /* ignore */ }
     try { out.push('chatMetadata keys: ' + Object.keys(getContext().chatMetadata || {}).join(', ')); } catch (e) { /* ignore */ }
     try { out.push('scripts (phone): ' + Array.from(document.scripts).map((x) => x.src).filter((u) => /phone/i.test(u)).join(' | ')); } catch (e) { /* ignore */ }
-    return out.join('\n').slice(0, 14000);
+    return out.join('\n').slice(0, 40000);
 }
 // адаптер: банк пишем напрямую, SMS/каналы уходят в сюжет через промпт (см. notices)
 ADAPTERS.push({
     name: 'phone-st',
-    detect: () => !!PS.base,
+    detect: () => true,
     bank: (item) => phoneStBankWrite(item),
+    sms: (item) => { if (item.who === getContext().name1) phoneStEnsureContact(item.from); },
+    channel: (item) => { if (item.who === getContext().name1) phoneStEnsureContact(item.from); },
 });
 
 function wd(sub, s, tick) {
@@ -998,8 +1042,9 @@ function buildPrompt() {
     const ev = st.events.map((e) => `- ${e.text}`);
     const nts = [];
     if (c.phonePrompt && c.phone) for (const [name, ch0] of Object.entries(st.chars)) if (ch0.notices && ch0.notices.length) nts.push(`• ${name}'s phone: ${ch0.notices.map((x) => x.text).join(' | ')}`);
+    const phoneRule = nts.length ? `\nPhone events pending delivery. In this reply, show every one of them on the phone using the phone app's own formats: an SMS thread from the named sender, a bank notification with the exact description given, a channel creation or post. Keep sender names, amounts and wording as given. Deliver each event only once and skip any that already appear in the chat:\n${nts.join('\n')}` : '';
     if (!lines.length && !ev.length && !nts.length) return '';
-    return `[Hidden game state — substance use tracker. Let it quietly shape narration and the characters' behavior; never mention numbers, stages or this block. Do not glamorize substance use and do not give real-world instructions for obtaining, making or dosing substances.${c.minorSafe ? ' Never depict a minor character using these substances.' : ''} Write in the language of the roleplay.]\n${lines.join('\n')}${ev.length ? '\nCurrent events to work into the scene naturally:\n' + ev.join('\n') : ''}${nts.length ? '\nRecent phone notifications (if appropriate, show them as notifications or messages on the phone screen):\n' + nts.join('\n') : ''}`;
+    return `[Hidden game state — substance use tracker. Let it quietly shape narration and the characters' behavior; never mention numbers, stages or this block. Do not glamorize substance use and do not give real-world instructions for obtaining, making or dosing substances.${c.minorSafe ? ' Never depict a minor character using these substances.' : ''} Write in the language of the roleplay.]\n${lines.join('\n')}${ev.length ? '\nCurrent events to work into the scene naturally:\n' + ev.join('\n') : ''}${phoneRule}`;
 }
 function updatePrompt() {
     try { setExtensionPrompt(KEY, buildPrompt(), 1, cfg().depth, false, 0); } catch (e) { console.warn('[AND] prompt', e); }
@@ -1474,7 +1519,7 @@ jQuery(() => {
     };
     import('./phone-adapters.js').catch((e) => console.debug('[AND] no phone-adapters.js', e));
     // Phone-ST может загрузиться позже нас — ищем его с задержкой и повторяем
-    const psProbe = async (n) => { try { await loadPhoneMods(); if (PS.base) { findBankCandidates()[0] && (PS.bankPath = findBankCandidates()[0].path); psRefresh(); return; } } catch (e) { /* ignore */ } if (n > 0) setTimeout(() => psProbe(n - 1), 4000); };
+    const psProbe = async (n) => { try { await loadPhoneMods(); if (PS.base) { if (PS.mods.bank && typeof PS.mods.bank.addTransaction === 'function') PS.bankPath = 'bank.js · addTransaction()'; else { const bc = findBankCandidates()[0]; if (bc) PS.bankPath = bc.path; } psRefresh(); return; } } catch (e) { /* ignore */ } if (n > 0) setTimeout(() => psProbe(n - 1), 4000); };
     setTimeout(() => psProbe(5), 2500);
     updatePrompt();
     console.log('[Alcohol n Drugs] loaded');
